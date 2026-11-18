@@ -17,7 +17,7 @@ Open the Google TV app's remote on your phone, pair it with the TV, select the t
 3. From this repository, run:
 
 ```powershell
-./enter-tv-text.ps1 -Serial <TV-IP>:5555 -FromClipboard
+./scripts/enter-tv-text.ps1 -Serial <TV-IP>:5555 -FromClipboard
 ```
 
 Review the value on the TV and choose Save yourself. The helper never submits the form. It checks the foreground app and active keyboard, refuses shell metacharacters, and does not write dumps or values to files. Clipboard input is read only when explicitly requested. Omit `-FromClipboard` for a hidden local prompt instead. `-PublicText` is intended only for public IDs or dummy tests; do not put secrets in shell command history. Older TVs without select-all support can clear a field manually and use `-Append`.

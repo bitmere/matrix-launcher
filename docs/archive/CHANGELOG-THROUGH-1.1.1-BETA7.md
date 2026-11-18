@@ -2,7 +2,7 @@
 
 ## 1.1.1-beta.7 — prerelease
 
-Includes the local beta 1–6 changes below. [Release notes](../RELEASE-1.1.1-beta.7.md).
+Includes the local beta 1–6 changes below. [Release notes](RELEASE-1.1.1-beta.7.md).
 
 - Replace the remote-inaccessible native wallpaper picker with shared TV album menus and image cards.
 - Add contextual image-only access with Android 14 partial-access handling; no all-files/video/write permission. Preserve file-manager sharing and existing backgrounds.
@@ -42,7 +42,7 @@ Includes the local beta 1–6 changes below. [Release notes](../RELEASE-1.1.1-be
 - Reuse row derivations and artwork aspect values; keep default nested prefetch after rejecting a regressing experiment.
 - Finalize release/setup documentation, retain measured limitations and archive local beta notes. No new runtime dependency or permission.
 
-133 JVM tests; zero lint errors. See [release notes](../RELEASE-1.1.md), [validation](../VALIDATION.md) and [historical beta experiments](../archive/BETA-54-56.md).
+133 JVM tests; zero lint errors. See [release notes](RELEASE-1.1.md), [validation](../VALIDATION.md) and [historical beta experiments](../archive/BETA-54-56.md).
 
 ## 1.0.1-beta.53 — component audit prerelease, 2026-11-04
 

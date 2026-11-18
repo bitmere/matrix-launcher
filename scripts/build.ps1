@@ -1,6 +1,7 @@
 param([switch]$Checks,[ValidateSet('Release','Preview','Check','Test')][string]$Mode='Release',[string[]]$Tests=@())
 $ErrorActionPreference='Stop'
-Set-Location $PSScriptRoot
+$repoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $repoRoot
 if($Tests.Count -gt 0 -and $Mode -ne 'Test'){throw '-Tests requires -Mode Test'}
 # Release signing is available only through GitHub Actions secrets. Check/Test
 # remain keyless; Preview is the local installable iteration path.
@@ -13,7 +14,7 @@ function Test-TaskJdk17([string]$directory){
     return $release -match 'JAVA_VERSION="17\.'
 }
 if(-not (Test-TaskJdk17 $env:JAVA_HOME)){
-    $localBuild=Join-Path $PSScriptRoot 'build.local.properties'
+    $localBuild=Join-Path $repoRoot 'build.local.properties'
     if(Test-Path $localBuild){
         $jdkLine=Get-Content $localBuild | Where-Object {$_ -match '^javaHome='} | Select-Object -First 1
         if($jdkLine){$env:JAVA_HOME=$jdkLine.Substring(9).Trim()}

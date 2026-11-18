@@ -1,6 +1,6 @@
 # Project review - beta 34
 
-Historical review. See the [1.1 release summary](RELEASE-1.1.md) for current status, the [beta 53 audit](CODE-REVIEW-53.md) for component coverage and the [optimization follow-up](OPTIMIZATION-54.md) for resolved startup/cache findings.
+Historical review. See the [1.1 release summary](archive/RELEASE-1.1.md) for current status, the [beta 53 audit](CODE-REVIEW-53.md) for component coverage and the [optimization follow-up](OPTIMIZATION-54.md) for resolved startup/cache findings.
 
 Reviewed by three area-specific subagents plus the parent review of build/test/device tools. Existing Apple-style Home and the corrected single card rim are retained. This is a source/caller review, tests and targeted integration validation, not proof that every firmware/account/provider combination is bug-free.
 
@@ -147,4 +147,4 @@ Production diff at review: 111 lines added, 263 removed (net 152 removed). Count
 
 ## 1.3 focused follow-up
 
-See [release scope](RELEASE-1.3.md) for the UI/backend findings and limits. The historical inventory above describes its original audit, not a new exhaustive certification.
+See [release scope](archive/RELEASE-1.3.md) for the UI/backend findings and limits. The historical inventory above describes its original audit, not a new exhaustive certification.

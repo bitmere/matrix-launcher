@@ -1,7 +1,7 @@
 # Documentation index
 
 Start with the root [README](../README.md), [house rules](../AGENTS.md),
-[handover](../HANDOVER.md) and [testing guide](../TESTING.md).
+[handover](HANDOVER.md) and [testing guide](TESTING.md).
 Commands in documentation assume the repository root unless stated otherwise.
 
 ## Guides and architecture
@@ -29,16 +29,16 @@ Dates, versions and scope inside each record identify the evidence it contains;
 
 ### Release notes
 
-- [RELEASE-1.1.1-beta.7](RELEASE-1.1.1-beta.7.md)
-- [RELEASE-1.1](RELEASE-1.1.md)
-- [RELEASE-1.2](RELEASE-1.2.md)
-- [RELEASE-1.3](RELEASE-1.3.md)
-- [RELEASE-1.4](RELEASE-1.4.md)
-- [RELEASE-2.0](RELEASE-2.0.md)
-- [RELEASE-2.1](RELEASE-2.1.md)
-- [RELEASE-2.2](RELEASE-2.2.md)
-- [RELEASE-2.3](RELEASE-2.3.md)
-- [RELEASE-2.5](RELEASE-2.5.md)
+- [RELEASE-1.1.1-beta.7](archive/RELEASE-1.1.1-beta.7.md)
+- [RELEASE-1.1](archive/RELEASE-1.1.md)
+- [RELEASE-1.2](archive/RELEASE-1.2.md)
+- [RELEASE-1.3](archive/RELEASE-1.3.md)
+- [RELEASE-1.4](archive/RELEASE-1.4.md)
+- [RELEASE-2.0](archive/RELEASE-2.0.md)
+- [RELEASE-2.1](archive/RELEASE-2.1.md)
+- [RELEASE-2.2](archive/RELEASE-2.2.md)
+- [RELEASE-2.3](archive/RELEASE-2.3.md)
+- [RELEASE-2.5](archive/RELEASE-2.5.md)
 
 ### Validation and device records
 

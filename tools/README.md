@@ -7,10 +7,10 @@ Keep device evidence and build outputs in ignored artifacts.
 
 | Helper | Purpose |
 | --- | --- |
-| [build.ps1](../build.ps1) | Keyless Preview/Check/Test modes; optimized release checks/signing require GitHub Actions secrets. See [testing](../TESTING.md). |
-| [install-compose-preview.ps1](../install-compose-preview.ps1) | Despite its name, installs the measured release artifact and verifies the installed hash. |
-| [optimize-app.ps1](../optimize-app.ps1) | App-only ART compilation or reset on the selected TV. |
-| [enter-tv-text.ps1](../enter-tv-text.ps1) | Guarded text entry into a focused Matrix field. |
+| [build.ps1](../scripts/build.ps1) | Keyless Preview/Check/Test modes; optimized release checks/signing require GitHub Actions secrets. See [testing](../docs/TESTING.md). |
+| [install-compose-preview.ps1](../scripts/install-compose-preview.ps1) | Despite its name, installs the measured release artifact and verifies the installed hash. |
+| [optimize-app.ps1](../scripts/optimize-app.ps1) | App-only ART compilation or reset on the selected TV. |
+| [enter-tv-text.ps1](../scripts/enter-tv-text.ps1) | Guarded text entry into a focused Matrix field. |
 | [adb_tv.ps1](adb_tv.ps1) | Windows ADB wrapper; reads TV_SERIAL, otherwise uses its built-in device address. |
 | [audit_structure.py](audit_structure.py) | Local structural and component contract audit. |
 | [release_gate.py](release_gate.py), [test_release_gate.py](test_release_gate.py) | Actions release metadata, signer and immutable publication gates; offline boundary tests run with the tool suite below. Requires the full approved public `MATRIX_RELEASE_CERT_SHA256` repository variable before release dispatch. |

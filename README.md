@@ -142,6 +142,6 @@ The [hero](docs/images/matrix-hero.png) and [Home mockup](docs/images/matrix-hom
 
 Use [GitHub issues](https://github.com/bitmere/matrix-launcher/issues) for help and reproducible bugs. Share device compatibility findings or contribute focused fixes/documentation. There is no donation link configured here.
 
-Developers: [documentation index](docs/README.md), [architecture](docs/ARCHITECTURE.md), [testing](TESTING.md), [tooling](tools/README.md), [AI index](llms.txt) and [source provenance](docs/PROVENANCE.md). The Android-free `core` module contains reusable policies; `app` contains Android adapters and Compose screens. Release builds use R8/resource shrinking; signing and publication remain in the existing GitHub Actions workflow. No release is created by these documentation changes.
+Developers: [documentation index](docs/README.md), [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md), [tooling](tools/README.md), [AI index](llms.txt) and [source provenance](docs/PROVENANCE.md). The Android-free `core` module contains reusable policies; `app` contains Android adapters and Compose screens. Release builds use R8/resource shrinking; signing and publication remain in the existing GitHub Actions workflow. No release is created by these documentation changes.
 
-Licensed under [MIT](LICENSE), with preserved upstream credits. [Outfit font license](FONT-LICENSE-OFL.txt) and [Fluent Emoji icon attribution](ICONS-LICENSE-FLUENT-EMOJI.txt) also apply. Third-party service names do not imply endorsement.
+Licensed under [MIT](LICENSE), with preserved upstream credits. See [third-party notices](THIRD_PARTY_NOTICES.md) for the Outfit font license and Fluent Emoji icon attribution. Third-party service names do not imply endorsement.

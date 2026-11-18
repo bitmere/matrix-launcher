@@ -14,7 +14,7 @@ Stable release dated 2026-11-04. Android 8.0/API 26 or newer. Finalizes the test
 
 Install over the existing Compose app; do not uninstall first. The package/signing identity, accounts, favorites, wallpaper selection and Home-service identities are retained. Shared Java edition data is separate. Photo access is requested only when importing device pictures. No new runtime dependency or permission is added beyond beta 7.
 
-144 JVM tests pass; lint has zero errors and one existing TV-orientation warning. Stable installation verified its checksum and retained Home/account/service state. After the user left the remote idle, final stable Home/favorites D-pad, wallpaper albums and Back checks passed; automatic input stopped on Home. Beta 7 D-pad album/grid/Back and temporary-image import checks passed, alongside earlier media-routing and physical Home/Inputs/Settings checks. [Current validation](VALIDATION.md) records the exact stable artifact and device results.
+144 JVM tests pass; lint has zero errors and one existing TV-orientation warning. Stable installation verified its checksum and retained Home/account/service state. After the user left the remote idle, final stable Home/favorites D-pad, wallpaper albums and Back checks passed; automatic input stopped on Home. Beta 7 D-pad album/grid/Back and temporary-image import checks passed, alongside earlier media-routing and physical Home/Inputs/Settings checks. [Current validation](../VALIDATION.md) records the exact stable artifact and device results.
 
 ## Artifact
 
@@ -29,7 +29,7 @@ The optimized, resource-shrunk release APK is installed with matching SHA256. Th
 
 The local browser shows up to 500 recent indexed images and copies selected images into the existing 20-import collection. Unindexed downloads can use file-manager Open with/Share. TV-specific permission and media-provider behavior can vary. On this TCL, Home key filtering retains the known held-volume repeat tradeoff. SIMKL AI search remains deferred until a documented API exists; normal search is unchanged. Direct add-on catalogs remain researched, not implemented. No YouTube integration changes are included.
 
-Accounts, device diagnostics, images and credentials are excluded from GitHub. See [wallpapers](WALLPAPERS.md), [media apps](MEDIA-APPS.md), [namespace compatibility](NAMESPACE.md) and [validation](VALIDATION.md).
+Accounts, device diagnostics, images and credentials are excluded from GitHub. See [wallpapers](../WALLPAPERS.md), [media apps](../MEDIA-APPS.md), [namespace compatibility](../NAMESPACE.md) and [validation](../VALIDATION.md).
 
 ## Future versions
 

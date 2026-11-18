@@ -2,7 +2,7 @@
 
 Installed on TCL C755 / Android 14; **not published**. VersionCode 100. Optimized APK **1,793,634 bytes** (1.71 MiB). Installed SHA256 matches `af1f29fd512997b40f8008c47d7bd3e6d323d0c2a1e46c2bdbdb35b84d5773cf`.
 
-Final Checks build: 75.3s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit, two tool tests and whitespace checks pass. The updated layout regression checks the expanded glow's actual painted footprint, focus-scale gutter and minimum usable artwork. [Scope and primary sources](../RELEASE-1.4.md).
+Final Checks build: 75.3s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit, two tool tests and whitespace checks pass. The updated layout regression checks the expanded glow's actual painted footprint, focus-scale gutter and minimum usable artwork. [Scope and primary sources](RELEASE-1.4.md).
 
 ## Artwork-coloured outward glow
 

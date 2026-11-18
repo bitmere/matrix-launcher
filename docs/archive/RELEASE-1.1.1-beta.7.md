@@ -25,4 +25,4 @@ D-pad checks covered album selection, grid movement, Downloader, Back and tempor
 
 The local browser shows up to 500 recent indexed images and copies selected images into the existing 20-import collection. Unindexed downloads can use file-manager Open with/Share. TV-specific permission and media-provider behavior can vary. On this TCL, Home key filtering retains the known held-volume repeat tradeoff. SIMKL AI search remains deferred until a documented API exists; normal search is unchanged. Direct add-on catalogs remain researched, not implemented. No YouTube integration changes are included.
 
-Accounts, device diagnostics, images and credentials are excluded from GitHub. See [wallpapers](WALLPAPERS.md), [media apps](MEDIA-APPS.md), [namespace compatibility](NAMESPACE.md) and [validation](VALIDATION.md).
+Accounts, device diagnostics, images and credentials are excluded from GitHub. See [wallpapers](../WALLPAPERS.md), [media apps](../MEDIA-APPS.md), [namespace compatibility](../NAMESPACE.md) and [validation](../VALIDATION.md).

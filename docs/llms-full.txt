@@ -118,10 +118,10 @@ Enables LLMs during inference to invoke in-process tools:
 ### 6.2 Build Commands (PowerShell)
 ```powershell
 # 1. Preview Build (unminified for rapid iteration)
-powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Preview
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Preview
 
 # 2. JVM Unit Tests
-powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Test
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Test
 
 # 3. Keyless full validation (release signing is GitHub Actions only)
 ./gradlew --no-daemon :app:testDebugUnitTest :core:test :app:lint :app:assembleDebug

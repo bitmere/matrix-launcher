@@ -1,12 +1,13 @@
 param([Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9._:-]+$')][string]$Serial,[switch]$Compile)
 $ErrorActionPreference='Stop'
-Set-Location $PSScriptRoot
+$repoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $repoRoot
 $sdk=if($env:ANDROID_HOME){$env:ANDROID_HOME}else{Join-Path $env:LOCALAPPDATA 'Android/Sdk'}
 $adb=Join-Path $sdk 'platform-tools/adb.exe'
 $package='com.matrix.launcher'
 $manifest=Get-Content artifacts/release-manifest.json -Raw | ConvertFrom-Json
 if($manifest.applicationId -ne $package){throw 'Build manifest is not the isolated Compose candidate'}
-$apk=Join-Path $PSScriptRoot "artifacts/$($manifest.apk)"
+$apk=Join-Path $repoRoot "artifacts/$($manifest.apk)"
 $hash=(Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
 if($hash -ne $manifest.sha256){throw 'Candidate APK checksum does not match its build manifest'}
 if($Serial -match ':'){

@@ -59,12 +59,12 @@ Or for a different device IP:
 Run the verified PowerShell installer script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-compose-preview.ps1 -Serial <YOUR_TV_IP>:5555 -Compile
+powershell -ExecutionPolicy Bypass -File .\scripts\install-compose-preview.ps1 -Serial <YOUR_TV_IP>:5555 -Compile
 ```
 
 *Example for TV at `192.168.1.150`:*
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install-compose-preview.ps1 -Serial 192.168.1.150:5555 -Compile
+powershell -ExecutionPolicy Bypass -File .\scripts\install-compose-preview.ps1 -Serial 192.168.1.150:5555 -Compile
 ```
 
 ---
@@ -88,7 +88,7 @@ When the AI CLI or installer first connects to your TV, a prompt will appear on 
 
 ## 5. What the Automated Installer Does
 
-The project's installer (`install-compose-preview.ps1`) automates the full deployment pipeline:
+The project's installer (`scripts/install-compose-preview.ps1`) automates the full deployment pipeline:
 1. **ADB Handshake**: Connects to `<TV_IP>:5555`.
 2. **Release Artifact Verification**: Reads `artifacts/release-manifest.json`, locates its named APK under `artifacts/` and verifies the APK SHA-256. Stage the exact approved Actions APK and a matching manifest before using this helper.
 3. **Safe Package Install**: Uses `pm install -r` to reinstall with data preserved only when signing certificates are compatible. It does not bypass the next-release signer transition or automatically uninstall the old app.

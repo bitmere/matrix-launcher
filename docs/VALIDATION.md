@@ -17,7 +17,7 @@ For the final integrated gate, add `clean` before the module tasks. These are ke
 
 Optimized stable artifact, versionCode **102**, installed on TCL C755 / Android 14. APK **1,793,626 bytes (1.71 MiB)**. Installed SHA256 matches `947d920ff1e4a3a6b81a246851c88005daaf7a92be223aa185bc50806dc17d70`.
 
-Final `build.ps1 -Checks`: 103s, **148 JVM tests**, zero failures/errors, lint zero errors and one existing TV-orientation warning. Structure audit, two Python tool tests and whitespace checks pass. [Scope and primary sources](RELEASE-2.0.md).
+Final `scripts/build.ps1 -Checks`: 103s, **148 JVM tests**, zero failures/errors, lint zero errors and one existing TV-orientation warning. Structure audit, two Python tool tests and whitespace checks pass. [Scope and primary sources](archive/RELEASE-2.0.md).
 
 ## UI and state
 
