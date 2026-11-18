@@ -1,0 +1,21 @@
+.gradle/
+**/build/
+local.properties
+artifacts/
+shots/
+research/
+*.jks
+*.keystore
+.env
+.env.*
+__pycache__/
+*.py[cod]
+
+build.local.properties
+.kotlin/
+.vscode/
+.agents/
+*.png
+
+# Generated public-launch artwork; device screenshots remain ignored.
+!/docs/images/*.png

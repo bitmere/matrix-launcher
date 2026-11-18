@@ -1,0 +1,135 @@
+# Matrix Launcher — Full Technical Specification for AI Agents & Developers
+
+> Comprehensive architectural, algorithmic, and workflow specification for Matrix Launcher on Android TV (Kotlin + Jetpack Compose for TV + TV Material 3).
+
+---
+
+## 1. Project Overview & Architectural Boundaries
+
+### 1.1 Core Principles
+- **Target Platform**: Android TV / Google TV (API 26+ / Android 8.0 through Android 14+). Target device: TCL Smart TV (`192.168.29.219:5555`).
+- **Independent Repository**: Independent from legacy Java checkouts. Installed package is `com.matrix.launcher` with base package `com.matrix.launcher`. Current source version is `v2.7.6` (`versionCode 155`). The historical baseline recorded on 2026-11-16 was `v2.7.4` (`versionCode 153`).
+- **Updater**. The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size and SHA-256 sidecar, and the package, version and bitmere signer before installation.
+- **Modular Division**:
+  - `:core`: Pure, Android-free Kotlin library. Contains media models, link schemas (`matrix-title://`, `stremio://`), link builders, and formatting utilities. Must NEVER depend on Android SDK classes (`android.*`).
+  - `:app`: Android application module with Jetpack Compose for TV (`androidx.tv:tv-material`), platform adapters, storage, network clients, MCP tool engines, AOT manager, and feature screens.
+- **Strict UI Architecture**:
+  - No legacy Views UI, no `RecyclerView`, no `AndroidView` wrappers, and no duplicate DI frameworks (Hilt/Koin/Dagger). Simple, explicit factory/repository injection is used.
+  - 100% deterministic D-pad focus handling and memory.
+  - Zero I/O in composition or on the main thread; all networking and disk access is executed via Kotlin Coroutines on `Dispatchers.IO`.
+
+---
+
+## 2. D-pad Focus Memory & Navigation Architecture
+
+### 2.1 Per-Row Card Focus Memory (`MatrixFocusRow.kt` & `MatrixHomeSurface.kt`)
+- **Problem Solved**: In standard Compose TV LazyRows, navigating vertically (down to another row and back up) historically caused focus to snap to Card 0 or snap to Euclidean bounding box coordinates.
+- **Implementation**:
+  - **Favorites Dock**: Tracks `focusedFavId` via `rememberSaveable` and assigns `favRetained` (`FocusRequester`). Passed as `fallback` to `MatrixFocusRow`.
+  - **Channel Rows**: Tracks `focusedId` via `rememberSaveable` and assigns `retained` (`FocusRequester`). Passed as `fallback` to `MatrixFocusRow`.
+  - **Entry Routing**: Inside `MatrixFocusRow.kt`:
+    ```kotlin
+    Modifier.focusRestorer(fallback).focusProperties {
+        enter = { if (fallback != FocusRequester.Default) fallback else FocusRequester.Default }
+        onExit = {
+            if (requestedFocusDirection == FocusDirection.Left || requestedFocusDirection == FocusDirection.Right) cancelFocusChange()
+            if (isLastRow && requestedFocusDirection == FocusDirection.Down) cancelFocusChange()
+        }
+    }
+    ```
+    This guarantees vertical inter-row navigation lands directly on the row's remembered card.
+  - **LazyLayout Pre-caching**: Horizontal rows use `LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 1f)` to retain nearby cards in the composition tree so focus requesters do not detach.
+  - **Boundary Safety**: Edge directions (Header Up and Bottom Row Down) cancel focus changes to prevent focus traps or void escaping.
+
+### 2.2 Remote Long-Press Key Event Isolation
+- **Problem Solved**: Holding D-pad Center on an app card opens the options dialog (`app-options`) after 380ms. While holding, the remote sends repeated `ACTION_DOWN` events, followed by an `ACTION_UP` upon release. Without isolation, the newly focused dialog button (e.g. "Remove favorite" or "Open") captured the trailing release event and executed immediately.
+- **Implementation**:
+  - In `MatrixHomeScreen.kt`, the Dialog container intercepts capture-phase events via `Modifier.onPreviewKeyEvent` with `sawFreshDown` tracking:
+    - If `ACTION_DOWN` has `repeatCount == 0`, marks `sawFreshDown = true` and allows it.
+    - If `ACTION_DOWN` has `repeatCount > 0` and `!sawFreshDown`, consumes and drops it.
+    - If `ACTION_UP` arrives and `!sawFreshDown`, consumes and drops it as an orphan long-press release.
+  - In `MatrixMenu.kt`, `LazyColumn` maintains a matching `sawMenuDown` guard so menu options only trigger if an intentional down press started inside the menu itself.
+
+---
+
+## 3. Embedded AOT Speed Manager (Stremio & Nuvio)
+
+### 3.1 Local ADB Loopback (`AotOptimizationManager.kt`)
+- **Architecture**: Embedded pure-Kotlin ADB client using `dadb` connecting directly to `127.0.0.1:5555`. Manages its own RSA key pair in `context.filesDir`. Requires **no external apps** (no Shizuku, Termux, or PC).
+- **Tracked Packages**:
+  - `com.stremio.one` (Stremio)
+  - `com.nuvio.tv` (Nuvio)
+- **Automatic Recompilation**:
+  - `AotPackageUpdateReceiver` in `AndroidManifest.xml` listens for `ACTION_PACKAGE_REPLACED` and `ACTION_PACKAGE_ADDED`.
+  - When Stremio or Nuvio is updated via Google Play or sideload, it silently triggers:
+    ```bash
+    cmd package compile -m speed -f <package>
+    ```
+    in the background via coroutine.
+- **In-Launcher UI**: Accessible from TV **Settings → AOT Performance** (`aot-control` in `MatrixHomeScreen.kt`), showing live DEX status and one-click manual recompilation.
+
+---
+
+## 4. Design System & Media Artwork (`MatrixCards.kt`)
+
+### 4.1 Media Artwork & Badging
+Each media item is rendered via `MatrixMediaCard` wrapping TV Material 3 `ClassicCard`:
+- **Ratio-Fitting Container (`MatrixArtwork`)**: Measures and fits poster artwork dynamically to target aspect ratios (portrait 2:3 or landscape 16:9) without subcomposition overhead.
+- **Outward Glass Focus Glow**: Custom `drawWithCache` shader rendering outward palette-tinted diffuse halo with subtle rotational gradient sheen when focused.
+- **Top-Start Badge**: Displays `card.mediaType` ("AI Pick", "Movie", "Series") in translucent frosted pill.
+- **Top-End Rating Badge**: Overlaid at `Alignment.TopEnd` via `extractRatingBadge(card.metadata)`. Evaluates IMDb -> TMDB -> SIMKL -> Star/Fractional scores. If unrated and release year $\ge$ current year, renders sky-blue `"UPCOMING"` pill (`Color(0xFF38BDF8)`).
+- **Bottom-Center Playback Progress**: Translucent track (`Color.White.copy(alpha = 0.22f)`) with high-contrast fill (`Color.White.copy(alpha = 0.94f)`) and `progressSemantics`.
+
+### 4.2 Backdrop Performance
+- `MatrixBackdrop.kt` uses `ARGB_8888` + `Paint.DITHER_FLAG` instead of `RGBA_F16`, halving texture memory bandwidth from 7.37MB to 3.68MB per frame transition.
+
+---
+
+## 5. Search & Discovery Subsystems
+
+### 5.1 Unified Search Architecture (`MatrixSearchRepository.kt`)
+Aggregates four independent search providers:
+1. **Catalog (Cinemeta)**: Keyless, instant Stremio catalog search querying `https://v3-cinemeta.strem.io` for movies and series in parallel.
+2. **SIMKL**: User list and media tracking provider with phone QR approval and cached previews.
+3. **TMDB**: Optional search provider requiring user API key.
+4. **AI Discovery**: Natural-language recommendation engine with parallel MCP tool resolution.
+
+### 5.2 Cinemeta Catalog Client (`CinemetaClient.kt`)
+- `searchCatalog(type, query)`: Fetches top matching movies or series with 512KB bounded buffer.
+- `getTopMetas(type)`: Fetches live trending items for dynamic home suggestions.
+- `getMeta(type, imdbId)`: Fetches comprehensive title metadata and IMDb ratings.
+- `checkAvailability(title, year)`: Verifies streaming playback readiness on Nuvio and Stremio.
+
+### 5.3 Model Context Protocol (MCP) (`MatrixMcpEngine.kt`)
+Enables LLMs during inference to invoke in-process tools:
+- `web_search`: Live search via DuckDuckGo HTML and Wikipedia API (zero API key needed).
+- `tv_context`: Inspects real TV platform state, current date/year, and installed streaming apps.
+- `lookup_stream_availability`: Cross-references Cinemeta to check if a title is ready for 1-click playback.
+
+---
+
+## 6. Development, Build & Device Verification Workflows
+
+### 6.1 Gradle 9.0 Toolchain Rules
+- In `app/build.gradle`, all Groovy properties must use explicit `=` assignment syntax (e.g. `namespace = 'com.matrix.launcher'`, `compose = true`, `minifyEnabled = true`).
+- Pinned Java toolchain: JDK 17 (`jvmToolchain(17)`).
+- Compile SDK: 36, Target SDK: 34, Min SDK: 26.
+
+### 6.2 Build Commands (PowerShell)
+```powershell
+# 1. Preview Build (unminified for rapid iteration)
+powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Preview
+
+# 2. JVM Unit Tests
+powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Test
+
+# 3. Keyless full validation (release signing is GitHub Actions only)
+./gradlew --no-daemon :app:testDebugUnitTest :core:test :app:lint :app:assembleDebug
+```
+
+### 6.3 TV Deployment & Verification Rules
+- Target TV: `192.168.29.219:5555`.
+- Install only the exact verified optimized APK downloaded from the approved GitHub Actions release run; see [clean-install and signer-transition guidance](NEW-TV-INSTALL.md). `-r` preserves settings only for compatible signers.
+- **STRICTLY NO SCREENSHOTS**:
+  - Verify layout, cards, and D-pad metrics via `adb -s 192.168.29.219:5555 shell dumpsys activity com.matrix.launcher --matrix-ui`.
+  - Verify UI element presence via `adb -s 192.168.29.219:5555 shell uiautomator dump` and XML hierarchy inspection.

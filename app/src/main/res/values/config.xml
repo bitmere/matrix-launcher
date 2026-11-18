@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string-array name="settings_fallback_components" translatable="false">
+        <item>com.xiaomi.mitv.settings/com.xiaomi.mitv.settings.entry.MainActivity</item>
+        <item>com.tcl.settings/com.tcl.settings.ui.MainActivity</item>
+        <item>com.amazon.tv.launcher/com.amazon.tv.launcher.ui.MainSettingsActivity</item>
+    </string-array>
+    <string name="live_tv_package" translatable="false">com.tcl.tv</string>
+    <bool name="boot_to_live_tv">false</bool>
+    <bool name="open_on_start_choice">false</bool>
+    <bool name="key_filter">true</bool>
+    <bool name="gamepad_passthrough">false</bool>
+    <bool name="consume_volume_keys">false</bool>
+    <integer-array name="settings_key_scancodes">
+    </integer-array>
+    <integer-array name="settings_key_keycodes">
+    </integer-array>
+    <bool name="settings_key_panel">false</bool>
+    <bool name="restore_key_services">false</bool>
+    <integer-array name="input_key_keycodes">
+    </integer-array>
+    <bool name="handle_view_inputs">false</bool>
+    <string-array name="app_keys" translatable="false">
+    </string-array>
+    <string name="stock_home_redirect" translatable="false" />
+    <bool name="power_on_home">false</bool>
+    <bool name="power_on_home_always">false</bool>
+    <bool name="home_long_press_home">false</bool>
+</resources>

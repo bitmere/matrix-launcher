@@ -1,0 +1,219 @@
+# Manual, separately approved releases only. Signing material exists only in Actions secrets.
+# MATRIX_RELEASE_CERT_SHA256 is the full public certificate fingerprint approved from rotation evidence.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing approved version tag, e.g. v2.7.5 or v2.7.5-beta.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  LC_ALL: C.UTF-8
+  GH_HOST: github.com
+  GH_PROMPT_DISABLED: '1'
+
+concurrency:
+  group: matrix-release-publication
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      MATRIX_RELEASE_CERT_SHA256: ${{ vars.MATRIX_RELEASE_CERT_SHA256 }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Set release work directory
+        run: echo "RELEASE_WORK=$RUNNER_TEMP/matrix-release" >> "$GITHUB_ENV"
+      - name: Require main-controlled workflow
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: test "$DISPATCH_REF" = refs/heads/main
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate approved tag and main ancestry
+        id: source
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+          git -c credential.helper='!gh auth git-credential' fetch origin +refs/heads/main:refs/remotes/origin/main
+          SOURCE_SHA=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          mkdir -p "$RELEASE_WORK"
+          cp tools/release_gate.py tools/test_release_gate.py "$RELEASE_WORK/"
+          cp .github/workflows/release.yml "$RELEASE_WORK/release.yml"
+          cp app/build.gradle "$RELEASE_WORK/build.gradle"
+          git checkout --detach "$SOURCE_SHA"
+          echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+      - name: Test controlling release gate
+        run: python3 -m unittest discover -s "$RELEASE_WORK" -p test_release_gate.py
+      - name: Validate version, channel and reviewed notes
+        run: python3 "$RELEASE_WORK/release_gate.py" prepare
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Verify toolchain
+        run: |
+          test -x ./gradlew
+          java -version
+          test -d "$ANDROID_HOME/platforms/android-36"
+          test -d "$ANDROID_HOME/build-tools"
+      - name: Clean keyless tests, lint and debug build
+        run: |
+          python3 tools/audit_structure.py
+          python3 -m unittest discover -s tools -p 'test_*.py'
+          ./gradlew --no-daemon clean :app:testDebugUnitTest :core:test :app:lint :app:lintRelease :app:assembleDebug
+      - name: Upload validation reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-${{ github.job }}-validation-reports-${{ github.run_attempt }}
+          path: |
+            app/build/reports/tests/
+            core/build/reports/tests/
+            app/build/reports/lint-results*
+          if-no-files-found: warn
+          retention-days: 7
+
+  release:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      MATRIX_RELEASE_CERT_SHA256: ${{ vars.MATRIX_RELEASE_CERT_SHA256 }}
+      VALIDATED_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Set release work directory
+        run: echo "RELEASE_WORK=$RUNNER_TEMP/matrix-release" >> "$GITHUB_ENV"
+      - name: Require main-controlled workflow
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: test "$DISPATCH_REF" = refs/heads/main
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate approved tag and main ancestry
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+          git -c credential.helper='!gh auth git-credential' fetch origin +refs/heads/main:refs/remotes/origin/main
+          SOURCE_SHA=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          test "$SOURCE_SHA" = "$VALIDATED_SOURCE_SHA"
+          mkdir -p "$RELEASE_WORK"
+          cp tools/release_gate.py tools/test_release_gate.py "$RELEASE_WORK/"
+          cp .github/workflows/release.yml "$RELEASE_WORK/release.yml"
+          cp app/build.gradle "$RELEASE_WORK/build.gradle"
+          git checkout --detach "$SOURCE_SHA"
+          echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+      - name: Test controlling release gate
+        run: python3 -m unittest discover -s "$RELEASE_WORK" -p test_release_gate.py
+      - name: Validate version, channel and reviewed notes
+        run: python3 "$RELEASE_WORK/release_gate.py" prepare
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Check signing configuration
+        env:
+          KEYSTORE: ${{ secrets.MATRIX_KEYSTORE_BASE64 }}
+          PROPS: ${{ secrets.MATRIX_KEYSTORE_PROPERTIES }}
+        run: |
+          test -n "$KEYSTORE"
+          test -n "$PROPS"
+          python3 - <<'PYTHON'
+          import os
+          pin = os.environ['MATRIX_RELEASE_CERT_SHA256'].lower()
+          assert pin == 'a21fc7cb0cf12ab08744e03a84fc45be7fd50aafb7397f054d250ce1a5151b9b', 'Full approved rotation fingerprint required'
+          PYTHON
+      - name: Recover existing immutable release APK before considering a build
+        id: recover
+        run: python3 "$RELEASE_WORK/release_gate.py" recover
+      - name: Restore ephemeral signing material
+        if: steps.recover.outputs.reuse != 'true'
+        env:
+          KEYSTORE: ${{ secrets.MATRIX_KEYSTORE_BASE64 }}
+          PROPS: ${{ secrets.MATRIX_KEYSTORE_PROPERTIES }}
+        run: |
+          umask 077
+          python3 - <<'PYTHON'
+          import base64, os, pathlib
+          work = pathlib.Path(os.environ['RELEASE_WORK'])
+          (work / 'release.jks').write_bytes(base64.b64decode(''.join(os.environ['KEYSTORE'].split()), validate=True))
+          # Last Java property wins; a blank line terminates a trailing continuation.
+          props = os.environ['PROPS'].rstrip('\r\n')
+          (work / 'keystore.properties').write_text(props + '\n\nstoreFile=' + str(work / 'release.jks') + '\n')
+          PYTHON
+      - name: Build optimized signed release once
+        if: steps.recover.outputs.reuse != 'true'
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache :app:assembleRelease "-Pmatrix.keystore.properties=$RELEASE_WORK/keystore.properties"
+          test -s app/build/outputs/mapping/release/mapping.txt
+          cp app/build/outputs/apk/release/app-release.apk "$RELEASE_WORK/Matrix-Launcher.apk"
+      - name: Verify exact artifact, full signer and checksum
+        run: python3 "$RELEASE_WORK/release_gate.py" verify
+      - name: Retain exact verified optimized bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-launcher-release-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/matrix-release/Matrix-Launcher.apk
+            ${{ runner.temp }}/matrix-release/Matrix-Launcher.apk.sha256
+          if-no-files-found: error
+          retention-days: 7
+      - name: Recheck remote approved tag and main before publication
+        run: |
+          set -euo pipefail
+          git -c credential.helper='!gh auth git-credential' fetch origin +refs/heads/main:refs/remotes/origin/main
+          git -c credential.helper='!gh auth git-credential' fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$SOURCE_SHA"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+      - name: Publish or verify GitHub Release without replacing assets
+        run: python3 "$RELEASE_WORK/release_gate.py" publish
+      - name: Verify public GitHub Release and downloaded assets
+        env:
+          GH_TOKEN: ''
+        run: python3 "$RELEASE_WORK/release_gate.py" anonymous
+      - name: Upload validation reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-${{ github.job }}-validation-reports-${{ github.run_attempt }}
+          path: |
+            app/build/reports/tests/
+            core/build/reports/tests/
+            app/build/reports/lint-results*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove temporary signing files
+        if: always()
+        run: rm -f "$RELEASE_WORK/release.jks" "$RELEASE_WORK/keystore.properties"

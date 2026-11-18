@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="matrix_launcher_name" translatable="false">Matrix Launcher</string>
+    <color name="matrix_icon_background">#081914</color>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="matrix_home_service_description">Opens Matrix Launcher with the remote’s Home button. Configure capture and startup recovery in Matrix’s Home settings.</string>
+    <string name="matrix_home_service_name">Matrix Launcher · Home control</string>
+</resources>

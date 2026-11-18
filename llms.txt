@@ -1,0 +1,40 @@
+# Matrix Launcher
+
+> Lightweight Android TV launcher built with Jetpack Compose for TV, TV Material 3, and Kotlin, featuring an Apple-style Home, keyless media catalog search, AI discovery with in-app Model Context Protocol (MCP) tools, deterministic D-pad focus memory, and automated AOT speed optimization.
+
+## Updates
+
+The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size and SHA-256 sidecar, and the package, version and bitmere signer before installation.
+
+## AI Handover & Architecture Map
+- [Documentation Index](docs/README.md): Guides, release records, roadmap and historical references.
+- [Detailed AI Reference](docs/llms-full.txt): Preserved technical reference; check version-specific claims against current sources.
+- [AI Handover & Continuity Guide](HANDOVER.md): Immediate context, architectural invariants, and recent changes for AI agents.
+- [Architecture](docs/ARCHITECTURE.md): Android TV launcher lifecycle, coroutines, and modular structure.
+- [Row Focus & Navigation Reference](docs/ROW-FOCUS.md): D-pad row memory, entry routing, and LazyLayoutCacheWindow specification.
+- [Release 2.5 Notes](docs/RELEASE-2.5.md): Focus restoration, memory halving, and benchmarks.
+- [New TV Installation Guide](docs/NEW-TV-INSTALL.md): Instructions for installing on new TVs using AI CLIs or ADB.
+- [TCL Smart TV Pro Optimization & Debloat Log](docs/TCL-SMART-TV-PRO-OPTIMIZATION.md): Telemetry removal, memory benchmarks, and rollback instructions for TCL Android TV hardware.
+- [App Core Module](core/src/main/java/com/matrix/launcher/core): Android-free pure Kotlin models, rules, and link generators.
+- [App Feature Module](app/src/main/java/com/matrix/launcher): Compose UI, TV Material 3, search providers, AOT manager, and AI integration.
+
+## Key Subsystems & Source Files
+- [Focus & Row Navigation](app/src/main/java/com/matrix/launcher/MatrixFocusRow.kt): Focus restoration with `fallback` focus requesters, `focusProperties.enter` direct routing, boundary trap cancellation, and `LazyLayoutCacheWindow`.
+- [Home Screen & Dock](app/src/main/java/com/matrix/launcher/MatrixHomeScreen.kt): Apple-style Home, favorites dock, capture-phase dialog key filtering (`sawFreshDown`), AOT performance settings, and D-pad navigation.
+- [Menu & Action Options](app/src/main/java/com/matrix/launcher/MatrixMenu.kt): TV Material settings menus with `sawMenuDown` guard preventing trailing long-press key release from auto-clicking options.
+- [AOT Speed Manager](app/src/main/java/com/matrix/launcher/AotOptimizationManager.kt): Embedded local ADB loopback client (`dadb`) over `127.0.0.1:5555` with `AotPackageUpdateReceiver` for automatic AOT `speed` compilation of Stremio and Nuvio without Shizuku or PC.
+- [Media Cards & Artwork](app/src/main/java/com/matrix/launcher/MatrixCards.kt): TV Material 3 ClassicCard with aspect-ratio fitting, outward glow shader, IMDb/TMDB/SIMKL rating overlay badge, playback progress, and `tvCardClickable` long-press handling.
+- [Backdrop Rendering](app/src/main/java/com/matrix/launcher/MatrixBackdrop.kt): High-performance ARGB_8888 + dithering backdrop surface halving GPU texture memory bandwidth.
+- [Search & Repository](app/src/main/java/com/matrix/launcher/MatrixSearchRepository.kt): Unified media search aggregating Cinemeta catalog, SIMKL, TMDB, and AI Discovery with poster resolution and caching.
+- [Cinemeta Catalog Client](app/src/main/java/com/matrix/launcher/CinemetaClient.kt): Keyless, free Stremio media catalog client for movies and series search and metadata lookups.
+- [AI Discovery Engine](app/src/main/java/com/matrix/launcher/MatrixAiClient.kt): Multi-provider inference client (DeepSeek, Gemini, Perplexity, OpenAI, Groq, OpenRouter) with structured JSON generation and strict release year filtering.
+- [Model Context Protocol (MCP)](app/src/main/java/com/matrix/launcher/MatrixMcpEngine.kt): In-process MCP tool execution engine exposing live web search, TV installed app context, and stream availability to LLMs.
+- [In-App Web Search Engine](app/src/main/java/com/matrix/launcher/MatrixWebSearchEngine.kt): Free live web search via DuckDuckGo and Wikipedia for factual verification on Android TV without API keys.
+- [Search UI & Animations](app/src/main/java/com/matrix/launcher/MatrixSearchScreen.kt): Search screen, voice search integration, fluid liquid water-wave Siri glowing orb, and animated progress glow.
+
+## Development & Build Commands
+- Build Preview APK: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Preview`
+- Run Unit Tests: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Test`
+- Keyless tests/lint: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Check`. Signed optimized releases are built only by GitHub Actions with existing secrets.
+- Install the exact verified optimized Actions APK; see [Actions download and signer-transition warning](docs/NEW-TV-INSTALL.md). The next release needs a clean install over the retired signer, losing settings.
+- Inspect TV UI hierarchy (NO screenshots): `adb -s <IP>:5555 shell dumpsys activity com.matrix.launcher --matrix-ui`

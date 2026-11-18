@@ -1,0 +1,114 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+
+def releaseVersion = new Properties()
+rootProject.file('version.properties').withInputStream { releaseVersion.load(it) }
+def publicVersion = releaseVersion.getProperty('versionName')
+def releaseChannel = releaseVersion.getProperty('releaseChannel')
+if (!(publicVersion ==~ /\d+\.\d+\.\d+(-beta\.\d+)?/) ||
+        !(releaseChannel in ['stable', 'beta']) ||
+        (publicVersion.contains('-beta.') != (releaseChannel == 'beta'))) {
+    throw new GradleException('version.properties must contain a matching stable or beta semantic version')
+}
+
+// Signing material exists only in GitHub Actions secrets. The release workflow
+// restores private temporary files and passes -Pmatrix.keystore.properties=<path>.
+// Keyless tests, lint and previews do not need this property. Without it release
+// output is unsigned; it must never be published or silently debug-signed.
+def keyProps = new Properties()
+def signingPropertiesPath = providers.gradleProperty('matrix.keystore.properties').orNull
+def keyFile = signingPropertiesPath ? rootProject.file(signingPropertiesPath) : null
+if (keyFile && (System.getenv('GITHUB_ACTIONS') != 'true' || !keyFile.isFile())) {
+    throw new GradleException('Release signing requires Actions temporary signing properties')
+}
+if (keyFile) {
+    keyFile.withInputStream { keyProps.load(it) }
+    if (['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].any { !keyProps.getProperty(it)?.trim() }) {
+        throw new GradleException('Release signing properties are incomplete')
+    }
+    def signingStore = new File(keyProps.getProperty('storeFile'))
+    if (!(signingStore.isAbsolute() ? signingStore : new File(keyFile.parentFile, signingStore.path)).isFile()) {
+        throw new GradleException('Release signing keystore is missing')
+    }
+}
+
+android {
+    namespace = 'com.matrix.launcher'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = 'com.matrix.launcher'
+        minSdk = 26
+        targetSdk = 34
+        versionCode = releaseVersion.getProperty('versionCode').toInteger()
+        versionName = publicVersion
+    }
+
+    buildFeatures { compose = true }
+    // Pin the JVM toolchain so direct gradlew calls use the same JDK as build.ps1.
+    kotlin { jvmToolchain(17) }
+
+    signingConfigs {
+        release {
+            if (keyFile) {
+                def signingStore = new File(keyProps['storeFile'])
+                storeFile = signingStore.isAbsolute() ? signingStore : new File(keyFile.parentFile, keyProps['storeFile'])
+                storePassword keyProps['storePassword']
+                keyAlias keyProps['keyAlias']
+                keyPassword keyProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        preview {
+            initWith debug
+            applicationIdSuffix = '.preview'
+            versionNameSuffix = '-dev'
+            matchingFallbacks = ['debug']
+            minifyEnabled = false
+            shrinkResources = false
+        }
+        release {
+            // R8 strips and optimises the code (AndroidX included): smaller APK, faster start on a slow TV CPU.
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig keyFile ? signingConfigs.release : null
+        }
+    }
+    // A sideloaded launcher keeps all its supported languages available offline.
+    bundle { language { enableSplit = false } }
+
+    packaging {
+        resources {
+            // Runtime does not use Kotlin reflection or debug probes.
+            excludes += ['kotlin/**', 'META-INF/*.version', 'META-INF/*.kotlin_module', 'DebugProbesKt.bin']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation project(':core')
+    implementation platform('androidx.compose:compose-bom:2026.03.00')
+    implementation 'androidx.activity:activity-compose:1.12.4'
+    implementation 'androidx.tv:tv-material:1.1.0'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.9.4'
+    implementation 'io.coil-kt:coil-compose:2.7.0'
+
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'dev.mobile:dadb:1.2.10'
+    // JVM tests for reusable geometry, navigation and backend policies; never included in the APK.
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}

@@ -1,0 +1,15 @@
+# Cursor Rules for Matrix Launcher Compose
+
+You are an expert Android TV engineer pair programming on Matrix Launcher Compose.
+Read and strictly adhere to:
+1. `AGENTS.md` for workflow rules, TV Material 3 constraints, and prohibited patterns.
+2. `llms.txt` and `docs/llms-full.txt` for the complete architectural and technical specification.
+
+Key Rules:
+- Keep core Android-free and reusable; app contains Android Compose feature screens.
+- All settings options, header navigation, and toolbar buttons use MatrixButton/MatrixControlStyle.
+- Icon-only controls use MatrixIconButton (TV Material IconButton) with centered icon layout (offset 0.0,0.0).
+- Do not reintroduce Classic Views, RecyclerView, or AndroidView wrappers.
+- Use TV Material 3 and deterministic D-pad behavior.
+- Increase versionCode in version.properties for every installed build.
+- Do not take screenshots on device; verify via XML hierarchy and dumpsys --matrix-ui.
