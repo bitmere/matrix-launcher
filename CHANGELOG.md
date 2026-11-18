@@ -77,7 +77,7 @@
 - Halved Backdrop GPU Memory (-50%): Converted `MatrixBackdrop` texture generation from `RGBA_F16` to `ARGB_8888` with dithering, reducing GPU memory and texture bandwidth spikes.
 - Banner Artwork & Coil Optimization: `HomeArtwork` now renders proportional banners in `RGB_565` (259KB each) with expanded 8MB in-memory cache; disabled crossfades on media cards for smooth 60fps scrolling on TV hardware.
 - Fully verified on physical TCL Android TV with UI Automator/dumpsys dumps and zero screenshots.
-- [Release notes](docs/RELEASE-2.5.md).
+- [Release notes](docs/archive/RELEASE-2.5.md).
 
 ## 2.3.1 — stable
 
@@ -92,14 +92,14 @@
 - Animated results reveal: smooth fade/slide-in transition with total results header (`12 titles found · Google Gemini`).
 - Recent searches & quick suggestions: persistent search history with "Clear all" button, one-click D-pad chips, and AI suggested query prompts.
 - Robust Gemini function calling: supports arbitrary part indices for `functionCall` and full tool schema parity.
-- [Release notes](docs/RELEASE-2.3.md).
+- [Release notes](docs/archive/RELEASE-2.3.md).
 
 ## 2.3.0 — stable
 
 - Built-in In-App Web Search & MCP Tool Engine (`MatrixWebSearchEngine`): free live DuckDuckGo HTML & Wikipedia search directly from the TV without paid search API subscriptions.
 - Direct Google Gemini Provider integration: native `generativelanguage.googleapis.com` support for `gemini-2.5-flash`, `gemini-2.5-pro`, and `gemini-2.0-flash` with structured JSON mode and connection testing.
 - Neuralwatt live web grounding: seamlessly feeds real-time 2025/2026 web facts into Neuralwatt `deepseek-v4.1-flash` for 100% free live web recommendations.
-- [Release notes](docs/RELEASE-2.3.md).
+- [Release notes](docs/archive/RELEASE-2.3.md).
 
 ## 2.2.0 — stable
 
@@ -107,13 +107,13 @@
 - AI Search upgrades: dual-source IMDb ratings on discovery cards, 2-line recommendation reasons, expanded 10–14 title results with 4096 tokens.
 - Multi-provider AI search support: OpenRouter live web search plugin, Perplexity Agent API (`/v1/responses`), and per-provider API key persistence.
 - Voice recognition enhancements with glowing mic indicator.
-- [Release notes](docs/RELEASE-2.2.md).
+- [Release notes](docs/archive/RELEASE-2.2.md).
 
 ## 2.1.0 — stable
 
 - Manual reload progress/completion feedback, with retained Settings result and no stale queued notice.
 - Shared Home row/header horizontal boundaries and correct Edit Favorites focus bookkeeping.
-- [Release notes](docs/RELEASE-2.1.md).
+- [Release notes](docs/archive/RELEASE-2.1.md).
 
 ## 2.0.0 — stable
 
@@ -121,17 +121,17 @@
 - Readable settings explanations and fewer unnecessary control allocations.
 - Slim translucent Continue Watching progress with watched-percentage accessibility state.
 - Shared dynamic row/grid geometry retained; current docs cleaned and historical evidence archived.
-- [Release scope and limits](docs/RELEASE-2.0.md), [validation](docs/VALIDATION.md).
+- [Release scope and limits](docs/archive/RELEASE-2.0.md), [validation](docs/VALIDATION.md).
 
 ## 1.3.0 — stable maintenance
 
 - Fix hidden-result/empty-gallery focus, reuse derived lists and stop cancelled image copies.
 - Clarify wallpaper breadcrumbs and remove obsolete native-picker query.
-- [Review scope, tests and limitations](docs/RELEASE-1.3.md).
+- [Review scope, tests and limitations](docs/archive/RELEASE-1.3.md).
 
 ## 1.2.0 — stable
 
 - Finalize the tested beta 1–7 changes: remote-friendly wallpaper browsing/import/share and saved selection, configurable media targets, consistent controls and upgrade-safe Matrix namespace.
-- Refresh current documentation and retain earlier validation as history. No new feature or Home-mode changes beyond beta 7. [Release notes](docs/RELEASE-1.2.md).
+- Refresh current documentation and retain earlier validation as history. No new feature or Home-mode changes beyond beta 7. [Release notes](docs/archive/RELEASE-1.2.md).
 
 [Earlier prerelease history](docs/archive/CHANGELOG-THROUGH-1.1.1-BETA7.md).

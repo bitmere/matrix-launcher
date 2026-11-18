@@ -2,7 +2,7 @@
 
 Installed on TCL C755 / Android 14; **not published**. VersionCode 98. Optimized APK **1,793,630 bytes** (1.71 MiB). Installed SHA256 matches `7b2cb8e92c7872d29a4eb2272c46fbc23f69d7cd6965a6e3b6c715755a0c5bcb`.
 
-Final Checks build: 74.8s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit, two tool tests and whitespace checks pass. [Scope and sources](../RELEASE-1.4.md).
+Final Checks build: 74.8s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit, two tool tests and whitespace checks pass. [Scope and sources](RELEASE-1.4.md).
 
 ## Revolving coloured border
 

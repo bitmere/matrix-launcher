@@ -37,6 +37,6 @@ SHA256: `edb05da2216e78c42abdd6af9d827b650ff09f37e730149d02e3fbd83f8ca020`.
 
 ## Known limits and evidence
 
-[Release notes](../RELEASE-1.1.md) list current limitations. [Nuvio handoff](../NUVIO-ROUTING.md) records the version-tested compatibility route, rejected task reset and corrected harness failures. [Optimization measurements](../OPTIMIZATION-54.md) retain warmup variance and residual frame spikes. No guarantee of zero jank, isolated RAM savings or every firmware/provider combination.
+[Release notes](RELEASE-1.1.md) list current limitations. [Nuvio handoff](../NUVIO-ROUTING.md) records the version-tested compatibility route, rejected task reset and corrected harness failures. [Optimization measurements](../OPTIMIZATION-54.md) retain warmup variance and residual frame spikes. No guarantee of zero jank, isolated RAM savings or every firmware/provider combination.
 
 Detailed beta 34–56 evidence is retained in [recent validation history](../archive/VALIDATION-BETA-34-56.md); [earlier validation](../archive/VALIDATION-HISTORY.md) is preserved separately. Device dumps, traces, screenshots and installation receipts remain only in ignored artifacts.

@@ -10,7 +10,7 @@ This release combines the tested Home preview work with focused settings and Con
 
 ## Validation and limits
 
-See [the final build, installed checksum and TV evidence](VALIDATION.md). Home smoothness is **not claimed fixed**: composition/layout and render-buffer waits remain. Continuous focused glow adds rendering work. Automatic wallpaper rotation limits strict before/after comparisons. The older Android glow fallback, all display/font sizes and a full TalkBack session were not device-tested.
+See [the final build, installed checksum and TV evidence](../VALIDATION.md). Home smoothness is **not claimed fixed**: composition/layout and render-buffer waits remain. Continuous focused glow adds rendering work. Automatic wallpaper rotation limits strict before/after comparisons. The older Android glow fallback, all display/font sizes and a full TalkBack session were not device-tested.
 
 Accounts, favorites, channels, wallpaper choices, Home capture/recovery, service identities and licenses are preserved. No integration is enabled by installation. Home key filtering retains its known held-volume repeat tradeoff. No playback engine, live background blur or background account-sync service is added.
 

@@ -1,6 +1,6 @@
 # Testing
 
-Run `./build.ps1 -Mode Test` for core and Android backend JVM tests. Focus core work with `./build.ps1 -Mode Test -Tests com.matrix.launcher.core.ReorderSessionTest`. Keyless current validation uses the repository wrapper:
+Run `../scripts/build.ps1 -Mode Test` for core and Android backend JVM tests. Focus core work with `../scripts/build.ps1 -Mode Test -Tests com.matrix.launcher.core.ReorderSessionTest`. The wrapper resolves the repository root from its own location. The same checks can also run directly with the Gradle wrapper from the repository root:
 
 ```sh
 ./gradlew --no-daemon :app:testDebugUnitTest :core:test :app:lint :app:assembleDebug
@@ -9,7 +9,7 @@ python3 tools/audit_structure.py
 python3 -m unittest discover -s tools -p 'test_*.py'
 ```
 
-Add `clean` before the module tasks for the final integrated gate. Use JDK 17 and Android SDK platform 36. Preview, Check and Test modes need no release credentials (`./build.ps1 -Mode Check` runs JVM tests and lint without packaging). Signing keys and passwords exist only in GitHub Actions secrets; local builds cannot produce the signed release. `build.ps1 -Checks` selects Release mode and is blocked locally; use `-Mode Check` for keyless checks. The Actions release workflow invokes the optimized build and verification directly. Download and verify that run's APK for device measurements; never substitute a preview or locally rebuilt APK. These policy tests do not prove Compose focus/rendering or TV firmware behavior.
+Add `clean` before the module tasks for the final integrated gate. Use JDK 17 and Android SDK platform 36. Preview, Check and Test modes need no release credentials (`../scripts/build.ps1 -Mode Check` runs JVM tests and lint without packaging). Signing keys and passwords exist only in GitHub Actions secrets; local builds cannot produce the signed release. `../scripts/build.ps1 -Checks` selects Release mode and is blocked locally; the Gradle commands above run the same keyless checks directly. The Actions release workflow invokes the optimized build and verification directly. Download and verify that run's APK for device measurements; never substitute a preview or locally rebuilt APK. These policy tests do not prove Compose focus/rendering or TV firmware behavior.
 
 Use an isolated emulator for navigation, settings/form states and visual checks. The existing Matrix_Compose_Review AVD is TV-shaped but uses a phone system image; it cannot validate vendor startup, actual TV providers or physical remote repeats. Test both a fresh app state and saved preferences without copying account secrets into fixtures.
 
@@ -19,7 +19,7 @@ Regression checklist: all main settings, Back history/focus, favorites cancel/sa
 
 Device evidence, screenshots, installed APK receipts, tokens and dumps belong only in ignored artifacts. Never publish test accounts or device dumps. A developer preview APK is for iteration, not publication.
 
-Current measured results await the overseer validation run: [validation commands and results placeholder](docs/VALIDATION.md). The same page preserves the **historical 2.0.0 report (2026-11-04)**; its measurements are not current 2.7.4 results.
+Current measured results await the overseer validation run: [validation commands and results placeholder](VALIDATION.md). The same page preserves the **historical 2.0.0 report (2026-11-04)**; its measurements are not current 2.7.4 results.
 
 For a playback-free warm Home-row sample, use `python tools/measure_navigation.py --adb <adb-path> --serial <TV-IP>:5555 --output artifacts/profiling/<label>`. It requires Matrix already in the foreground, wakes the TV, opens this preview, checks the focused package, saves a warm-state capture and records gfxinfo after 24 paced D-pad moves. Optionally pass the official Perfetto `record_android_trace` helper with `--trace-helper`; traces stay under ignored artifacts. Confirm the warm capture before comparing runs. A single device sample is not a universal FPS claim, and unreliable vendor GPU counters must not be presented as measurements.
 

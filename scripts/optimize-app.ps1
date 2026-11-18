@@ -1,6 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$TvHost,[switch]$Reset)
 $ErrorActionPreference='Stop'
-Set-Location $PSScriptRoot
+$repoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $repoRoot
 $taskSdk=if($env:ANDROID_HOME){$env:ANDROID_HOME}else{Join-Path $env:LOCALAPPDATA 'Android/Sdk'}
 $adb=Join-Path $taskSdk 'platform-tools/adb.exe'
 if(-not(Test-Path $adb)){throw 'Set ANDROID_HOME to the Android SDK with platform-tools installed'}

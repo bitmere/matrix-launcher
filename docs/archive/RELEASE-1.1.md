@@ -14,11 +14,11 @@ Historical stable release, superseded by [1.2.0](RELEASE-1.2.md). Released 2026-
 
 Install the release APK over the existing Compose app; it retains the same package/signing identity and account/preferences data. Verify the accompanying SHA256. Do not uninstall first. Java edition data is separate. Installation does not enable integrations or change Home permission choices.
 
-Use [Home setup](HOME-SETUP.md), [search setup](SEARCH.md), [SIMKL text entry](API-ENTRY.md), [wallpapers](WALLPAPERS.md) and [testing](../TESTING.md). The APK is minified/resource-shrunk; no new runtime dependency or permission was added in the final fixes.
+Use [Home setup](../HOME-SETUP.md), [search setup](../SEARCH.md), [SIMKL text entry](../API-ENTRY.md), [wallpapers](../WALLPAPERS.md) and [testing](../TESTING.md). The APK is minified/resource-shrunk; no new runtime dependency or permission was added in the final fixes.
 
 ## Evidence and limits
 
-133 JVM tests pass; lint has no errors and one existing TV-orientation warning. Beta 55 reboot recovery and real Home/Inputs/Settings were verified. Beta 56 actual-card tests verified warm movie/series and SIMKL-to-Search switching. [Validation](VALIDATION.md) records exact versions, hashes and test limitations; the exact stable APK is installed and checksum-verified, with a separate brief dump-based Home/navigation check.
+133 JVM tests pass; lint has no errors and one existing TV-orientation warning. Beta 55 reboot recovery and real Home/Inputs/Settings were verified. Beta 56 actual-card tests verified warm movie/series and SIMKL-to-Search switching. [Validation](../VALIDATION.md) records exact versions, hashes and test limitations; the exact stable APK is installed and checksum-verified, with a separate brief dump-based Home/navigation check.
 
 - Some navigation/frame spikes remain; measured warm improvements do not certify uninterrupted 60 fps or a causal RAM reduction.
 - TCL Home key filtering can reduce held-volume repeats to one step. Keep the documented Home-mode tradeoff.

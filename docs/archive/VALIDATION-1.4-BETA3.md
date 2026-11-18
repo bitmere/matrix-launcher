@@ -2,7 +2,7 @@
 
 Installed on TCL C755 / Android 14; **not published**. VersionCode 97. Optimized APK **1,793,634 bytes** (1.71 MiB). Installed SHA256 matches `f62626ce1a3a05fcc1fa9c88b6f8fc7ee0e446e34f0e487e1003245cc39faa52`.
 
-Final Checks build: 84.1s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit and whitespace checks pass. [Scope and design sources](../RELEASE-1.4.md).
+Final Checks build: 84.1s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit and whitespace checks pass. [Scope and design sources](RELEASE-1.4.md).
 
 ## Focus-border motion
 

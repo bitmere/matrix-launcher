@@ -48,7 +48,7 @@ android {
     }
 
     buildFeatures { compose = true }
-    // Pin the JVM toolchain so direct gradlew calls use the same JDK as build.ps1.
+    // Pin the JVM toolchain so direct gradlew calls use the same JDK as scripts/build.ps1.
     kotlin { jvmToolchain(17) }
 
     signingConfigs {

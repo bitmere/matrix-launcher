@@ -2,7 +2,7 @@
 
 VersionCode 94; optimized APK 1,793,626 bytes, SHA256 `4722597be2f1d903875ef7565d6302a6c24e9b8bf240676a1f9d658a33759fbe`. Build checks completed in 108.6s: 148 JVM tests, zero lint errors and the existing orientation warning; structure audit and two tool tests pass.
 
-Installed APK checksum verified. Scoped dumps passed Home entry, favorites Right/Left, wallpaper album menu and Back, then three four-direction cycles in the image grid with exact indices 0/1/4/3/0 (12 transitions). Accounts, seven rows, Automatic media target and Home binding retained. Final Home screenshot inspected. Automatic input stopped on Home; no media/image selected, account/default change or reboot. Hidden loading/error focus and cancellation-during-read paths are JVM-tested; they were not forced through live network faults on the TV. This targeted pass does not certify every screen or quantify frame-time improvement. [Review scope](../RELEASE-1.3.md).
+Installed APK checksum verified. Scoped dumps passed Home entry, favorites Right/Left, wallpaper album menu and Back, then three four-direction cycles in the image grid with exact indices 0/1/4/3/0 (12 transitions). Accounts, seven rows, Automatic media target and Home binding retained. Final Home screenshot inspected. Automatic input stopped on Home; no media/image selected, account/default change or reboot. Hidden loading/error focus and cancellation-during-read paths are JVM-tested; they were not forced through live network faults on the TV. This targeted pass does not certify every screen or quantify frame-time improvement. [Review scope](RELEASE-1.3.md).
 
 ---
 
@@ -22,4 +22,4 @@ Current setup/release docs now target 1.2.0. Earlier validation is preserved as 
 
 ## Known limits
 
-See [release notes](../RELEASE-1.2.md). This version does not claim uninterrupted 60 fps, a measured RAM reduction, TMDB live credential validation or newly tested full Continue Watching playback. TCL Home key filtering retains the known held-volume tradeoff. Direct add-on catalogs and SIMKL AI search are not implemented. No YouTube integration changes.
+See [release notes](RELEASE-1.2.md). This version does not claim uninterrupted 60 fps, a measured RAM reduction, TMDB live credential validation or newly tested full Continue Watching playback. TCL Home key filtering retains the known held-volume tradeoff. Direct add-on catalogs and SIMKL AI search are not implemented. No YouTube integration changes.

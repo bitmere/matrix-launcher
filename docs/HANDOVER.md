@@ -1,6 +1,6 @@
 # AI Handover & Architectural Continuity
 
-For repository navigation, see the [documentation index](docs/README.md) and [tool index](tools/README.md).
+For repository navigation, see the [documentation index](README.md) and [tool index](../tools/README.md).
 
 ## Project State Overview
 - **Repository**: `matrix-launcher` (Independent Kotlin / Jetpack Compose for Android TV).
@@ -38,7 +38,7 @@ For repository navigation, see the [documentation index](docs/README.md) and [to
 ### 4. Build & Toolchain
 - **Gradle 9.0 Clean**: All Groovy build script assignments in `app/build.gradle` use `=` assignment syntax (e.g. `namespace = 'com.matrix.launcher'`, `compose = true`, `minifyEnabled = true`).
 - **Dependencies**: Java 17 toolchain, Android SDK 36, compileSdk 36, targetSdk 34, minSdk 26.
-- **Signing**: Existing release keys/passwords are GitHub Actions secrets only. Local Preview, Check and Test modes remain keyless; `build.ps1 -Checks` selects Release mode and is blocked locally; the Actions release workflow builds and verifies the optimized APK directly. Use the exact verified optimized Actions APK for device checks. The next release requires a clean install and settings loss over retired signer `15198ed1…`; the new signer begins `bd4e6bf1…`. See [installation guidance](docs/NEW-TV-INSTALL.md).
+- **Signing**: Existing release keys/passwords are GitHub Actions secrets only. Local Preview, Check and Test modes remain keyless; `scripts/build.ps1 -Checks` selects Release mode and is blocked locally; the Actions release workflow builds and verifies the optimized APK directly. Use the exact verified optimized Actions APK for device checks. The next release requires a clean install and settings loss over retired signer `15198ed1…`; the new signer begins `bd4e6bf1…`. See [installation guidance](NEW-TV-INSTALL.md).
 - **Testing on TV**: Strictly adhere to user requirement: **Do NOT take screenshots for testing; use UI Automator inspection dumps and dumpsys** (`dumpsys activity com.matrix.launcher --matrix-ui`).
 
 ---

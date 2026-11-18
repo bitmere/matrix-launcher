@@ -9,10 +9,10 @@ The manual updater reads the latest stable GitHub Release in `bitmere/matrix-lau
 ## AI Handover & Architecture Map
 - [Documentation Index](docs/README.md): Guides, release records, roadmap and historical references.
 - [Detailed AI Reference](docs/llms-full.txt): Preserved technical reference; check version-specific claims against current sources.
-- [AI Handover & Continuity Guide](HANDOVER.md): Immediate context, architectural invariants, and recent changes for AI agents.
+- [AI Handover & Continuity Guide](docs/HANDOVER.md): Immediate context, architectural invariants, and recent changes for AI agents.
 - [Architecture](docs/ARCHITECTURE.md): Android TV launcher lifecycle, coroutines, and modular structure.
 - [Row Focus & Navigation Reference](docs/ROW-FOCUS.md): D-pad row memory, entry routing, and LazyLayoutCacheWindow specification.
-- [Release 2.5 Notes](docs/RELEASE-2.5.md): Focus restoration, memory halving, and benchmarks.
+- [Release 2.5 Notes](docs/archive/RELEASE-2.5.md): Focus restoration, memory halving, and benchmarks.
 - [New TV Installation Guide](docs/NEW-TV-INSTALL.md): Instructions for installing on new TVs using AI CLIs or ADB.
 - [TCL Smart TV Pro Optimization & Debloat Log](docs/TCL-SMART-TV-PRO-OPTIMIZATION.md): Telemetry removal, memory benchmarks, and rollback instructions for TCL Android TV hardware.
 - [App Core Module](core/src/main/java/com/matrix/launcher/core): Android-free pure Kotlin models, rules, and link generators.
@@ -33,8 +33,8 @@ The manual updater reads the latest stable GitHub Release in `bitmere/matrix-lau
 - [Search UI & Animations](app/src/main/java/com/matrix/launcher/MatrixSearchScreen.kt): Search screen, voice search integration, fluid liquid water-wave Siri glowing orb, and animated progress glow.
 
 ## Development & Build Commands
-- Build Preview APK: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Preview`
-- Run Unit Tests: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Test`
-- Keyless tests/lint: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -Mode Check`. Signed optimized releases are built only by GitHub Actions with existing secrets.
+- Build Preview APK: `powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Preview`
+- Run Unit Tests: `powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Test`
+- Keyless tests/lint: `powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Check`. Signed optimized releases are built only by GitHub Actions with existing secrets.
 - Install the exact verified optimized Actions APK; see [Actions download and signer-transition warning](docs/NEW-TV-INSTALL.md). The next release needs a clean install over the retired signer, losing settings.
 - Inspect TV UI hierarchy (NO screenshots): `adb -s <IP>:5555 shell dumpsys activity com.matrix.launcher --matrix-ui`

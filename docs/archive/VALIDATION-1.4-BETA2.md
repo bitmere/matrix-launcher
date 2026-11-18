@@ -2,7 +2,7 @@
 
 Installed on TCL C755 / Android 14; **not published**. Stable 1.3.0 remains published. VersionCode 96; optimized APK **1,793,634 bytes** (1.71 MiB, 8 bytes above 1.3). SHA256 `fffd78ee07c5ba8052608ec0ebd250d64ccecaf15dd7a3785990963dffd50577`; installer verified exact installed bytes.
 
-Final Checks build: 80.1s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit, two tool tests, Python syntax, changed-document links and whitespace checks pass. [Preview scope and primary design sources](../RELEASE-1.4.md).
+Final Checks build: 80.1s, **148 JVM tests**, zero lint errors and the existing orientation warning. Structure audit, two tool tests, Python syntax, changed-document links and whitespace checks pass. [Preview scope and primary design sources](RELEASE-1.4.md).
 
 ## Performance comparison
 

@@ -57,7 +57,7 @@ No run/tag API shape is assumed: source checks use Git and Actions' declared out
 - Real Git tests use temporary local bare repositories: one advancing commit, identical
   rerun, non-main default branch, conflicting APK, rollback and concurrent writer.
 - No JDK, Android SDK, PowerShell or actionlint is installed here. No Android artifact
-  was requested/built/installed; `build.ps1 -Checks`, Gradle and live Actions/signing/PAT
+  was requested/built/installed; `scripts/build.ps1 -Checks`, Gradle and live Actions/signing/PAT
   integration were therefore not executed. Offline success is not live release proof.
 - Corrupt, ambiguous, incomplete or externally changed state deliberately stops safely;
   this patch does not delete drafts, incomplete assets, or replace existing bytes.

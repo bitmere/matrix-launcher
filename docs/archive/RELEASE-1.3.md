@@ -12,7 +12,7 @@ Focused maintenance release following 1.2.0; preserves the existing Home design 
 
 Two parallel reviews covered UI focus/navigation and backend import handling. This is a targeted review, not a claim that every project line or every TV state was exhaustively verified. No new feature, runtime dependency or permission. No measured Home-jank improvement is claimed. Cancellation cannot interrupt an OS-blocked read or an encode already in progress. Existing Home key-filtering/held-volume tradeoff remains.
 
-The changes follow [Compose performance guidance](https://developer.android.com/develop/ui/compose/performance/bestpractices): reuse nontrivial derived collections and retain existing shared lazy layout keys/content types. Tests cover hidden results, breadcrumbs, cancellation during a read and exact/over-limit copies. Device validation is recorded in [VALIDATION.md](VALIDATION.md).
+The changes follow [Compose performance guidance](https://developer.android.com/develop/ui/compose/performance/bestpractices): reuse nontrivial derived collections and retain existing shared lazy layout keys/content types. Tests cover hidden results, breadcrumbs, cancellation during a read and exact/over-limit copies. Device validation is recorded in [VALIDATION.md](../VALIDATION.md).
 
 ## Release checks
 

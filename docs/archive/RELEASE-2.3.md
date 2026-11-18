@@ -29,6 +29,6 @@
 
 ## Verification
 - Unit test suite passed (126 tests completed, 0 failed).
-- R8 minification, resource shrinking, and full release checks passed (`build.ps1 -Checks`).
+- R8 minification, resource shrinking, and full release checks passed (`scripts/build.ps1 -Checks`).
 - Optimized APK: **1,842,878 bytes (1.76 MiB)**, `versionCode 124`.
 - SHA-256: `C9B0B01A0AB7AEE07FEDDFFC606F02CE8101111CDD3D9AB8DE3C086E78552C11`.
