@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.8 — stable
+
+- Impeccable P1 fixes (PR #4): AI search now shows a Siri-style orb (56dp luminous sphere, five-colour sweep swirl, one rotation per 6s, gradient confined inside the orb); theme changes apply live without restarting the app; a Cinemeta outage now says "Catalog unavailable — check connection" instead of "no results"; focused cards get a solid 2dp theme ring and a bolder title, and posters have loading and error states.
+- Tests: 786 JVM tests, all passing; lint 0 errors, 4 warnings.
+
 ## 2.7.7 — stable
 
 - Release pages now show only the APK: the SHA-256 moves into the release notes (`SHA-256: …`) and the updater reads it from there, with the `.sha256` sidecar as fallback for older releases (PR #2).
