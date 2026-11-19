@@ -17,19 +17,55 @@ class UpdateCheckTest {
         .put("name", name).put("size", size).put("state", "uploaded")
         .put("browser_download_url", "$TEST_RELEASE_DOWNLOAD/$name")
 
-    private fun document() = JSONObject()
+    private fun document() = document(body = "Reviewed notes\n\nAndroid-Version-Code: 155")
+
+    private fun document(body: String, sidecar: Boolean = true) = JSONObject()
         .put("tag_name", TAG).put("name", "Matrix Launcher $TAG")
         .put("html_url", "https://github.com/$UPDATE_REPO/releases/tag/$TAG")
         .put("draft", false).put("prerelease", false)
-        .put("body", "Reviewed notes\n\nAndroid-Version-Code: 155")
-        .put("assets", JSONArray().put(asset(UPDATE_APK, 3)).put(asset(UPDATE_CHECKSUM, CHECKSUM_BYTES)))
+        .put("body", body)
+        .put("assets", JSONArray().put(asset(UPDATE_APK, 3))
+            .apply { if (sidecar) put(asset(UPDATE_CHECKSUM, CHECKSUM_BYTES)) })
 
     @Test fun parsesStableRelease() {
         assertEquals(
             LatestRelease("2.7.6", 155, "$TEST_RELEASE_DOWNLOAD/$UPDATE_APK", 3,
-                "$TEST_RELEASE_DOWNLOAD/$UPDATE_CHECKSUM", "Reviewed notes"),
+                "$TEST_RELEASE_DOWNLOAD/$UPDATE_CHECKSUM", "Reviewed notes", ""),
             UpdateCheck.parseRelease(document().toString())
         )
+    }
+
+    @Test fun parsesNotesHashAndOptionalSidecarIndependently() {
+        val hash = "a".repeat(64)
+        for (hasHash in listOf(false, true)) {
+            for (hasSidecar in listOf(false, true)) {
+                val body = "Reviewed notes\n\n" +
+                    (if (hasHash) "SHA-256: $hash\n" else "") + "Android-Version-Code: 155"
+                val release = UpdateCheck.parseRelease(document(body, hasSidecar).toString())
+                assertEquals(if (hasHash) hash else "", release.sha256)
+                assertEquals(if (hasSidecar) "$TEST_RELEASE_DOWNLOAD/$UPDATE_CHECKSUM" else "", release.checksumUrl)
+                assertEquals("Reviewed notes", release.notes)
+            }
+        }
+    }
+
+    @Test fun rejectsMalformedNotesHashesEvenWithSidecar() {
+        val hash = "a".repeat(64)
+        val hashLine = "SHA-256: $hash"
+        for (line in listOf(hashLine.dropLast(1), "SHA-256: ${hash.uppercase()}", "$hashLine ",
+            "SHA-256:  $hash", "SHA-256:", "$hashLine\n$hashLine", "$hashLine\nMore notes", " $hashLine")) {
+            val body = "Reviewed notes\n\n$line\nAndroid-Version-Code: 155"
+            assertTrue(line, runCatching { UpdateCheck.parseRelease(document(body).toString()) }
+                .exceptionOrNull() is org.json.JSONException)
+        }
+    }
+
+    @Test fun rejectsWrongSidecarSizeEvenWithNotesHash() {
+        val hash = "a".repeat(64)
+        val body = "Reviewed notes\n\nSHA-256: $hash\nAndroid-Version-Code: 155"
+        val assets = JSONArray().put(asset(UPDATE_APK, 3)).put(asset(UPDATE_CHECKSUM, CHECKSUM_BYTES - 1))
+        assertTrue(runCatching { UpdateCheck.parseRelease(document(body).put("assets", assets).toString()) }
+            .exceptionOrNull() is java.io.IOException)
     }
 
     @Test fun rejectsInvalidReleaseMetadata() {
@@ -53,7 +89,6 @@ class UpdateCheckTest {
         val apk = asset(UPDATE_APK, 3)
         val invalid = listOf(
             JSONArray().put(checksum()),
-            JSONArray().put(apk),
             JSONArray().put(apk).put(apk).put(checksum()),
             JSONArray().put(asset(UPDATE_APK, 3).put("browser_download_url", "https://example.invalid/$UPDATE_APK")).put(checksum()),
             JSONArray().put(asset(UPDATE_APK, 3).put("state", "starter")).put(checksum()),
@@ -101,5 +136,35 @@ class UpdateCheckTest {
         for ((status, text) in listOf(403 to "rate-limited", 429 to "rate-limited", 404 to "unavailable", 500 to "HTTP 500")) {
             assertTrue((check(status, 154) as UpdateCheckResult.Error).message.contains(text))
         }
+    }
+
+    @Test fun checkOffersNotesHashReleaseWithoutChecksumFetch() = runBlocking {
+        val hash = "a".repeat(64)
+        val body = "Reviewed notes\n\nSHA-256: $hash\nAndroid-Version-Code: 155"
+        val connection = Connection(200, document(body, sidecar = false).toString())
+        val result = UpdateCheck.check(154) { url ->
+            assertEquals(UPDATE_LATEST_URL, url)
+            connection
+        }
+        val release = (result as UpdateCheckResult.Available).release
+        assertEquals(hash, release.sha256)
+        assertEquals("", release.checksumUrl)
+        assertTrue(connection.closed)
+    }
+
+    @Test fun checkOffersSidecarFallbackRelease() = runBlocking {
+        val connection = Connection(200, document().toString())
+        val result = UpdateCheck.check(154) { connection }
+        val release = (result as UpdateCheckResult.Available).release
+        assertEquals("", release.sha256)
+        assertEquals("$TEST_RELEASE_DOWNLOAD/$UPDATE_CHECKSUM", release.checksumUrl)
+    }
+
+    @Test fun checkRejectsMalformedNotesHash() = runBlocking {
+        val hash = "a".repeat(64)
+        val body = "Reviewed notes\n\nSHA-256: ${hash.uppercase()}\nAndroid-Version-Code: 155"
+        val connection = Connection(200, document(body).toString())
+        val result = UpdateCheck.check(154) { connection }
+        assertTrue((result as UpdateCheckResult.Error).message.contains("malformed"))
     }
 }

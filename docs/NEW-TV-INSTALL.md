@@ -10,8 +10,8 @@ Signing keys and random passwords exist only in GitHub Actions secrets. Local bu
 
 ## Get the APK from GitHub Releases
 
-1. Download `Matrix-Launcher.apk` and `Matrix-Launcher.apk.sha256` from the [latest GitHub Release](https://github.com/bitmere/matrix-launcher/releases/latest).
-2. Extract `Matrix-Launcher.apk` and `Matrix-Launcher.apk.sha256` into an ignored local artifacts directory. Verify `sha256sum -c Matrix-Launcher.apk.sha256` there (or compare `Get-FileHash -Algorithm SHA256` on Windows). Keep the checksum and exact APK bytes together; never rebuild or modify them for installation.
+1. Download `Matrix-Launcher.apk` from the [latest GitHub Release](https://github.com/bitmere/matrix-launcher/releases/latest).
+2. Extract `Matrix-Launcher.apk` into an ignored local artifacts directory. Verify its SHA-256 against the `SHA-256:` line in the release notes (`sha256sum Matrix-Launcher.apk` and compare the hash, or compare `Get-FileHash -Algorithm SHA256` on Windows). Keep the checksum and exact APK bytes together; never rebuild or modify them for installation.
 3. Check the run's signer/package/version verification. It must verify the full approved certificate fingerprint, `com.matrix.launcher`, intended version/code and non-debuggable optimized artifact.
 4. Complete the approved clean-install transition first when the old signer is installed. Then use `adb -s <YOUR_TV_IP>:5555 install Matrix-Launcher.apk`; use `-r` only for subsequent compatible-signer updates. Verify the installed APK hash against the downloaded APK. The legacy helper below instead requires its matching local `artifacts/release-manifest.json`; the release checksum file alone is not that manifest.
 

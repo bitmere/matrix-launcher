@@ -24,6 +24,31 @@ internal object ApkDownload {
     internal fun parseChecksum(bytes: ByteArray): String? =
         sidecar.matchEntire(bytes.toString(Charsets.US_ASCII))?.groupValues?.get(1)
 
+    private val hashPattern = Regex("[0-9a-f]{64}")
+
+    /** Resolves the expected SHA-256 for [release]: the notes hash when
+     * present (no network request), else the strict sidecar fetch, else
+     * an error so no unverifiable download starts. */
+    internal fun checksum(
+        release: LatestRelease,
+        connect: (String) -> HttpURLConnection,
+        active: () -> Unit
+    ): String {
+        if (release.sha256.isNotEmpty()) {
+            if (!hashPattern.matches(release.sha256)) {
+                throw UpdateVerificationException("The release checksum is invalid.")
+            }
+            return release.sha256
+        }
+        if (release.checksumUrl.isEmpty()) throw IOException("The update has no published checksum.")
+        val tag = "v${release.versionName}"
+        return readReleaseAsset(release.checksumUrl, tag, UPDATE_CHECKSUM, connect, active) { connection ->
+            checkLength(connection, CHECKSUM_BYTES.toLong())
+            val bytes = connection.inputStream.use { readBounded(it, CHECKSUM_BYTES, active) }
+            parseChecksum(bytes) ?: throw UpdateVerificationException("The release checksum is invalid.")
+        }
+    }
+
     suspend fun download(
         filesDir: File,
         release: LatestRelease,
@@ -36,11 +61,7 @@ internal object ApkDownload {
         val tag = "v${release.versionName}"
         val expectedSize = release.apkSize
         if (expectedSize !in 1..minOf(maxBytes, MAX_APK_BYTES)) throw IOException("Invalid update size.")
-        val expectedHash = readReleaseAsset(release.checksumUrl, tag, UPDATE_CHECKSUM, connect, active) { connection ->
-            checkLength(connection, CHECKSUM_BYTES.toLong())
-            val bytes = connection.inputStream.use { readBounded(it, CHECKSUM_BYTES, active) }
-            parseChecksum(bytes) ?: throw UpdateVerificationException("The release checksum is invalid.")
-        }
+        val expectedHash = checksum(release, connect, active)
 
         val dir = updatesDir(filesDir)
         val target = File.createTempFile("Matrix-${release.versionCode}-", ".apk", dir)

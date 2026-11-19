@@ -12,9 +12,10 @@ import java.nio.file.Files
 
 class UpdateFlowTest {
     private val release = LatestRelease("2.7.6", 155, "$TEST_RELEASE_DOWNLOAD/$UPDATE_APK", 3,
-        "$TEST_RELEASE_DOWNLOAD/$UPDATE_CHECKSUM", "")
+        "$TEST_RELEASE_DOWNLOAD/$UPDATE_CHECKSUM", "", "")
     private val apkHash = java.security.MessageDigest.getInstance("SHA-256")
         .digest("apk".toByteArray()).joinToString("") { "%02x".format(it) }
+    private val notesRelease = release.copy(sha256 = apkHash, checksumUrl = "")
 
     private fun checksum(hash: String = apkHash) =
         Connection(bytes = "$hash  $UPDATE_APK\n".toByteArray())
@@ -31,6 +32,52 @@ class UpdateFlowTest {
         override fun getInputStream() = body ?: ByteArrayInputStream(bytes)
         override fun getContentLengthLong() = -1L
         override fun getHeaderField(name: String?) = location
+    }
+
+    @Test fun checksumReturnsNotesHashWithoutNetwork() {
+        val hash = ApkDownload.checksum(notesRelease, connect = { throw AssertionError("Unexpected checksum fetch") }) { }
+        assertEquals(apkHash, hash)
+    }
+
+    @Test fun checksumFallsBackToStrictSidecar() {
+        val hash = ApkDownload.checksum(release, connect = { url ->
+            assertEquals(release.checksumUrl, url)
+            checksum()
+        }) { }
+        assertEquals(apkHash, hash)
+        val result = runCatching {
+            ApkDownload.checksum(release, connect = { Connection(bytes = "$apkHash $UPDATE_APK \n".toByteArray()) }) { }
+        }
+        assertTrue(result.exceptionOrNull() is UpdateVerificationException)
+    }
+
+    @Test fun checksumRejectsInvalidNotesHashWithoutNetwork() {
+        val result = runCatching {
+            ApkDownload.checksum(notesRelease.copy(sha256 = apkHash.uppercase()),
+                connect = { throw AssertionError("Unexpected checksum fetch") }) { }
+        }
+        assertTrue(result.exceptionOrNull() is UpdateVerificationException)
+    }
+
+    @Test fun checksumRejectsMissingHashSourceWithoutNetwork() {
+        val result = runCatching {
+            ApkDownload.checksum(notesRelease.copy(sha256 = ""),
+                connect = { throw AssertionError("Unexpected checksum fetch") }) { }
+        }
+        assertTrue(result.exceptionOrNull() is IOException)
+    }
+
+    @Test fun downloadsWithNotesHashAndNoSidecarFetch() = runBlocking {
+        val dir = Files.createTempDirectory("download-notes-hash").toFile()
+        try {
+            val connection = Connection()
+            val file = ApkDownload.download(dir, notesRelease, connect = { url ->
+                assertEquals(notesRelease.apkUrl, url)
+                connection
+            }) { _, total -> assertEquals(3L, total ?: -1L) }
+            assertEquals("apk", file.readText())
+            assertTrue(connection.closed)
+        } finally { dir.deleteRecursively() }
     }
 
     @Test fun downloadsWithoutLengthAndDisconnects() = runBlocking {
