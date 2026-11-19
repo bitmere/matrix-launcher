@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.7 — stable
+
+- Release pages now show only the APK: the SHA-256 moves into the release notes (`SHA-256: …`) and the updater reads it from there, with the `.sha256` sidecar as fallback for older releases (PR #2).
+- Tests: 256 JVM tests, all passing; lint 0 errors, 4 warnings.
+
 ## 2.7.6 — stable
 
 - The Nuvio-way updater reads GitHub Releases and checks APK size, SHA-256, package, version and signing certificate.
