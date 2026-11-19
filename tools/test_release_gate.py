@@ -44,6 +44,43 @@ class PublicationGateTest(unittest.TestCase):
             finally:
                 os.chdir(old)
 
+    def test_metadata_rejects_reserved_sha256_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            old = Path.cwd()
+            try:
+                os.chdir(directory)
+                Path('version.properties').write_text('versionName=2.7.6\nversionCode=155\nreleaseChannel=stable\n')
+                Path('CHANGELOG.md').write_text('## 2.7.6\nReviewed change\nSHA-256: ' + 'a' * 64 + '\n')
+                with self.assertRaisesRegex(ValueError, 'Reserved SHA-256 marker'):
+                    gate.metadata('v2.7.6')
+            finally:
+                os.chdir(old)
+
+    def test_sha256_notes_helpers(self):
+        notes = self.meta['notes']
+        sha = 'a' * 64
+        hashed = gate.notes_with_sha256(notes, sha)
+        self.assertTrue(hashed.endswith(f'SHA-256: {sha}\nAndroid-Version-Code: 155'))
+        self.assertIsNone(gate.sha256_from_notes(notes))
+        self.assertEqual(gate.sha256_from_notes(hashed.replace('\n', '\r\n')), sha)
+        with self.assertRaisesRegex(ValueError, 'already contain'):
+            gate.notes_with_sha256(hashed, sha)
+        for invalid in ('', sha[:-1], sha.upper(), sha + ' '):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, 'Invalid SHA-256 digest'):
+                gate.notes_with_sha256(notes, invalid)
+        with self.assertRaisesRegex(ValueError, 'version trailer'):
+            gate.notes_with_sha256('Notes only', sha)
+
+    def test_malformed_notes_hashes_fail_closed(self):
+        line = 'SHA-256: ' + 'a' * 64
+        trailer = 'Android-Version-Code: 155'
+        for prefix in (line[:-1], line.replace('a', 'A'), line + ' ', ' ' + line,
+                       line.replace(': ', ':  '), 'SHA-256:', f'{line}\n{line}', f'{line}\nNotes'):
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                gate.sha256_from_notes(f'{prefix}\n{trailer}\n')
+        with self.assertRaisesRegex(ValueError, 'trailer'):
+            gate.sha256_from_notes(f'{line}\n{trailer}\nExtra')
+
     def test_prefix_only_or_retired_signer_rejected_before_tool_invocation(self):
         for pin in ('', gate.PIN[:8], 'bd4e6bf1' + 'a' * 56):
             with patch.dict(os.environ, MATRIX_RELEASE_CERT_SHA256=pin), self.assertRaisesRegex(ValueError, 'fingerprint'):
@@ -158,7 +195,8 @@ class PublicationGateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             output = work / 'output'
-            with patch.dict(os.environ, GITHUB_OUTPUT=str(output)), patch.object(gate, 'release_state', return_value=dict(assets=[asset])), patch.object(gate, 'download_asset') as download:
+            release = dict(assets=[asset], draft=True, body=self.meta['notes'])
+            with patch.dict(os.environ, GITHUB_OUTPUT=str(output)), patch.object(gate, 'release_state', return_value=release), patch.object(gate, 'download_asset') as download:
                 gate.recover(self.meta, 'v2.7.6', 'abc', work)
                 download.assert_called_once_with(asset, work / 'Matrix-Launcher.apk')
                 self.assertEqual(output.read_text(), 'reuse=true\n')
@@ -178,8 +216,6 @@ class PublicationGateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             (work / 'Matrix-Launcher.apk').write_bytes(b'verified')
-            sha = gate.digest(work / 'Matrix-Launcher.apk')
-            (work / 'Matrix-Launcher.apk.sha256').write_text(f'{sha}  Matrix-Launcher.apk\n')
             release = dict(id=17, assets=[dict(name='Matrix-Launcher.apk', id=7)], draft=False)
             def divergent_download(asset, destination):
                 destination.write_bytes(b'divergent')
@@ -209,10 +245,10 @@ class ReleaseLifecycleTest(unittest.TestCase):
         self.apk = b'optimized-fixture'
         self.sha = gate.hashlib.sha256(self.apk).hexdigest()
         (self.work / 'Matrix-Launcher.apk').write_bytes(self.apk)
-        (self.work / 'Matrix-Launcher.apk.sha256').write_text(f'{self.sha}  Matrix-Launcher.apk\n')
         (self.work / 'notes.md').write_text(self.meta['notes'])
         self.release = dict(id=448631718, tag_name='v2.7.6', target_commitish='abc', draft=True,
-                            prerelease=False, name='Matrix Launcher v2.7.6', body=self.meta['notes'], assets=[])
+                            prerelease=False, name='Matrix Launcher v2.7.6',
+                            body=gate.notes_with_sha256(self.meta['notes'], self.sha), assets=[])
         self.releases = [self.release]
         self.bytes = {}
         self.calls = []
@@ -250,7 +286,7 @@ class ReleaseLifecycleTest(unittest.TestCase):
         if method == 'PATCH':
             self.assertIn('/releases/448631718', path)
             if payload.get('draft') is False:
-                self.assertEqual({a['name'] for a in self.release['assets']}, {'Matrix-Launcher.apk', 'Matrix-Launcher.apk.sha256'})
+                self.assertEqual({a['name'] for a in self.release['assets']}, {'Matrix-Launcher.apk'})
             self.release.update(payload)
             return copy.deepcopy(self.release)
         if '/assets?' in path:
@@ -277,7 +313,7 @@ class ReleaseLifecycleTest(unittest.TestCase):
     def test_stable_rollback_rechecked_before_making_draft_public(self):
         def after_uploads(asset, destination):
             self.download(asset, destination)
-            if len(self.release['assets']) == 2 and len(self.releases) == 1:
+            if len(self.release['assets']) == 1 and len(self.releases) == 1:
                 self.releases.append(dict(tag_name='v2.7.7', draft=False, prerelease=False,
                                           body='Android-Version-Code: 156'))
 
@@ -285,14 +321,14 @@ class ReleaseLifecycleTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'rollback'):
                 self.publish()
         self.assertTrue(self.release['draft'])
-        self.assertEqual(len(self.release['assets']), 2)
+        self.assertEqual(len(self.release['assets']), 1)
 
     def test_listed_untagged_url_draft_uploads_and_publishes_by_id(self):
         self.release['html_url'] = 'https://github.com/bitmere/matrix-launcher/releases/untagged-2a6aca463bfb5e1dbc45'
         self.publish()
         self.assertFalse(self.release['draft'])
         uploads = [c for c in self.calls if c[3] is not None]
-        self.assertEqual(len(uploads), 2)
+        self.assertEqual(len(uploads), 1)
         self.assertTrue(all('/releases/448631718/assets?' in c[0] for c in uploads))
         self.assertFalse(any('/tags/' in c[0] for c in self.calls))
         self.assertFalse(any(c[1] == 'DELETE' for c in self.calls))
@@ -319,7 +355,7 @@ class ReleaseLifecycleTest(unittest.TestCase):
     def test_lost_upload_response_reconciles_without_overwriting(self):
         self.lose_upload = True
         self.publish()
-        self.assertEqual(len(self.release['assets']), 2)
+        self.assertEqual(len(self.release['assets']), 1)
 
     def test_corrupt_upload_prevents_publication(self):
         self.corrupt_upload = True
@@ -353,20 +389,56 @@ class ReleaseLifecycleTest(unittest.TestCase):
             self.publish()
         self.assertTrue(all(c[1] == 'GET' for c in self.calls))
 
-    def test_local_bytes_and_checksum_cannot_change_after_verification(self):
-        for filename in gate.ASSETS:
-            path = self.work / filename
-            previous = path.read_bytes()
-            path.write_bytes(b'{}')
-            with self.subTest(filename=filename), self.assertRaises(ValueError):
-                self.publish()
-            path.write_bytes(previous)
-        self.assertEqual(self.calls, [])
+    def test_publish_rejects_missing_or_mismatched_notes_hash_before_writes(self):
+        for body in (self.meta['notes'], gate.notes_with_sha256(self.meta['notes'], '0' * 64)):
+            with self.subTest(body=body):
+                self.release['body'] = body
+                with self.assertRaisesRegex(ValueError, 'notes/title mismatch'):
+                    self.publish()
+                self.assertTrue(all(call[1] == 'GET' for call in self.calls))
+                self.calls.clear()
+                self.release['body'] = gate.notes_with_sha256(self.meta['notes'], self.sha)
 
-    def test_recovery_rejects_checksum_only_draft(self):
+    def test_local_apk_change_or_wrong_notes_hash_never_publishes(self):
+        for body, apk_bytes in ((gate.notes_with_sha256(self.meta['notes'], '0' * 64), self.apk),
+                                (self.release['body'], b'{}')):
+            with self.subTest(body=body):
+                original_body = self.release['body']
+                original_apk = (self.work / 'Matrix-Launcher.apk').read_bytes()
+                self.release['body'] = body
+                (self.work / 'Matrix-Launcher.apk').write_bytes(apk_bytes)
+                with self.assertRaisesRegex(ValueError, 'notes/title mismatch'):
+                    self.publish()
+                self.assertTrue(all(call[1] == 'GET' for call in self.calls))
+                self.release['body'] = original_body
+                (self.work / 'Matrix-Launcher.apk').write_bytes(original_apk)
+                self.calls.clear()
+
+    def test_recovery_rejects_draft_with_assets_but_no_apk(self):
         self.release['assets'] = [dict(id=1, name='Matrix-Launcher.apk.sha256', state='uploaded', size=80)]
-        with self.assertRaisesRegex(ValueError, 'checksum exists without APK'):
+        with self.assertRaisesRegex(ValueError, 'divergent rebuild'):
             gate.recover(self.meta, 'v2.7.6', 'abc', self.work)
+
+    def test_recover_draft_and_published_apk_checks_notes_hash(self):
+        self.release['assets'] = [dict(id=1, name='Matrix-Launcher.apk', state='uploaded', size=len(self.apk))]
+        with patch.object(gate, 'download_asset', side_effect=lambda asset, dest: dest.write_bytes(self.apk)):
+            with patch.dict(os.environ, GITHUB_OUTPUT=str(self.work / 'output')):
+                gate.recover(self.meta, 'v2.7.6', 'abc', self.work)
+                self.assertEqual((self.work / 'output').read_text(), 'reuse=true\n')
+            self.release['body'] = gate.notes_with_sha256(self.meta['notes'], '0' * 64)
+            with patch.dict(os.environ, GITHUB_OUTPUT=str(self.work / 'output')), self.assertRaisesRegex(ValueError, 'notes SHA-256 mismatch'):
+                gate.recover(self.meta, 'v2.7.6', 'abc', self.work)
+
+    def test_recover_hashless_draft_but_reject_hashless_published_release(self):
+        self.release['assets'] = [dict(id=1, name='Matrix-Launcher.apk', state='uploaded', size=len(self.apk))]
+        self.release['body'] = self.meta['notes']
+        with patch.object(gate, 'download_asset', side_effect=lambda asset, dest: dest.write_bytes(self.apk)):
+            with patch.dict(os.environ, GITHUB_OUTPUT=str(self.work / 'output')):
+                gate.recover(self.meta, 'v2.7.6', 'abc', self.work)
+                self.assertEqual((self.work / 'output').read_text(), 'reuse=true\n')
+            self.release['draft'] = False
+            with patch.dict(os.environ, GITHUB_OUTPUT=str(self.work / 'output')), self.assertRaisesRegex(ValueError, 'missing notes SHA-256'):
+                gate.recover(self.meta, 'v2.7.6', 'abc', self.work)
 
 class TransportAndParsingTest(unittest.TestCase):
     setUp = PublicationGateTest.setUp
@@ -643,47 +715,41 @@ class OriginalBehaviorRegressionTest(unittest.TestCase):
 class PublicReleaseTest(unittest.TestCase):
     setUp = PublicationGateTest.setUp
 
-    def test_anonymous_compares_public_metadata_and_both_assets(self):
+    def test_anonymous_compares_public_metadata_and_apk_only(self):
         tag = 'v2.7.6'
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             apk = b'optimized APK'
             sha = gate.hashlib.sha256(apk).hexdigest()
-            blobs = dict(zip(gate.ASSETS, (apk, gate.checksum_line(sha))))
-            assets = []
-            for name, blob in blobs.items():
-                (work / name).write_bytes(blob)
-                assets.append(dict(name=name, size=len(blob), state='uploaded',
-                                   browser_download_url=f'https://github.com/{gate.REPO}/releases/download/{tag}/{name}'))
+            (work / gate.APK).write_bytes(apk)
+            assets = [dict(name=gate.APK, size=len(apk), state='uploaded',
+                           browser_download_url=f'https://github.com/{gate.REPO}/releases/download/{tag}/{gate.APK}')]
             release = dict(tag_name=tag, name=f'Matrix Launcher {tag}', draft=False, prerelease=False,
-                           body=self.meta['notes'], assets=assets)
-            with patch.object(gate, 'public_bytes', side_effect=[json.dumps(release).encode(), *blobs.values()]) as fetch:
+                           body=gate.notes_with_sha256(self.meta['notes'], sha), assets=assets)
+            with patch.object(gate, 'public_bytes', side_effect=[json.dumps(release).encode(), apk]) as fetch:
                 self.assertEqual(gate.anonymous(self.meta, tag, work), sha)
                 self.assertEqual(fetch.call_args_list[0].args[0],
                                  f'https://api.github.com/repos/{gate.REPO}/releases/tags/{tag}')
+                self.assertEqual(len(fetch.call_args_list), 2)
             for bad in (dict(release, draft=True), dict(release, body='missing trailer'),
-                        dict(release, assets=assets[:1]), dict(release, assets=assets + assets[:1]),
-                        dict(release, assets=[dict(assets[0], size=1), assets[1]])):
-                with patch.object(gate, 'public_bytes', return_value=json.dumps(bad).encode()), self.assertRaises(ValueError):
+                        dict(release, body=gate.notes_with_sha256(self.meta['notes'], '0' * 64)),
+                        dict(release, assets=[]), dict(release, assets=assets + assets),
+                        dict(release, assets=assets + [dict(assets[0], name='Matrix-Launcher.apk.sha256')]),
+                        dict(release, assets=[dict(assets[0], size=1)])):
+                with self.subTest(bad=bad), patch.object(gate, 'public_bytes', return_value=json.dumps(bad).encode()), self.assertRaises(ValueError):
                     gate.anonymous(self.meta, tag, work)
-            for public_apk, public_checksum in ((b'x' * len(apk), blobs[gate.CHECKSUM]),
-                                               (apk, b'x' * gate.CHECKSUM_BYTES)):
-                with patch.object(gate, 'public_bytes', side_effect=[json.dumps(release).encode(), public_apk, public_checksum]):
-                    with self.assertRaisesRegex(ValueError, 'Public asset bytes differ'):
-                        gate.anonymous(self.meta, tag, work)
+            with patch.object(gate, 'public_bytes', side_effect=[json.dumps(release).encode(), b'x' * len(apk)]):
+                with self.assertRaisesRegex(ValueError, 'Public asset bytes differ'):
+                    gate.anonymous(self.meta, tag, work)
 
-    def test_checksum_requires_exact_lowercase_spacing_and_lf(self):
+    def test_verified_checksum_is_digest_of_apk_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             (work / gate.APK).write_bytes(b'bytes')
-            sha = gate.digest(work / gate.APK)
-            line = gate.checksum_line(sha)
-            for bad in (line.rstrip(), line.replace(b'\n', b'\r\n'), line.replace(b'  ', b' '), line.upper()):
-                (work / gate.CHECKSUM).write_bytes(bad)
-                with self.assertRaisesRegex(ValueError, 'Local checksum differs'):
-                    gate.verified_checksum(work)
-            (work / gate.CHECKSUM).write_bytes(line)
-            self.assertEqual(gate.verified_checksum(work), sha)
+            self.assertEqual(gate.verified_checksum(work), gate.digest(work / gate.APK))
+            (work / gate.APK).write_bytes(b'')
+            with self.assertRaisesRegex(ValueError, 'Invalid APK size'):
+                gate.verified_checksum(work)
 
 
 if __name__ == '__main__':

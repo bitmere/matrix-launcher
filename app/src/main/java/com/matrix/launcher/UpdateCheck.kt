@@ -24,7 +24,8 @@ internal data class LatestRelease(
     val apkUrl: String,
     val apkSize: Long,
     val checksumUrl: String,
-    val notes: String
+    val notes: String,
+    val sha256: String
 )
 
 internal sealed interface UpdateCheckResult {
@@ -36,6 +37,7 @@ internal sealed interface UpdateCheckResult {
 internal object UpdateCheck {
     private val stableTag = Regex("v[0-9]+\\.[0-9]+\\.[0-9]+")
     private val versionLine = Regex("Android-Version-Code: ([1-9][0-9]*)")
+    private val hashLine = Regex("SHA-256: ([0-9a-f]{64})")
     private class InvalidAssets : IOException()
 
     fun parseRelease(json: String): LatestRelease {
@@ -49,6 +51,14 @@ internal object UpdateCheck {
         val code = versionLine.matchEntire(lines.last())?.groupValues?.get(1)?.toLongOrNull()
         if (code == null || lines.dropLast(1).any { it.trimStart().startsWith("Android-Version-Code", ignoreCase = true) }) {
             throw JSONException("Invalid versionCode trailer")
+        }
+        // At most one SHA-256 line, and when present it must be the penultimate
+        // line matching exactly, with no leading or trailing whitespace.
+        val hashCount = lines.count { it.trimStart().startsWith("SHA-256:") }
+        val sha256 = if (hashCount == 0) "" else {
+            if (hashCount != 1 || lines.size < 2) throw JSONException("Invalid SHA-256 line in release notes")
+            hashLine.matchEntire(lines[lines.lastIndex - 1])?.groupValues?.get(1)
+                ?: throw JSONException("Invalid SHA-256 line in release notes")
         }
 
         val assets = release.optJSONArray("assets") ?: throw InvalidAssets()
@@ -67,9 +77,17 @@ internal object UpdateCheck {
             return url to size
         }
         val (apkUrl, apkSize) = asset(UPDATE_APK, ApkDownload.MAX_APK_BYTES)
-        val (checksumUrl, checksumSize) = asset(UPDATE_CHECKSUM, CHECKSUM_BYTES.toLong())
-        if (checksumSize != CHECKSUM_BYTES.toLong()) throw InvalidAssets()
-        return LatestRelease(tag.removePrefix("v"), code, apkUrl, apkSize, checksumUrl, lines.dropLast(1).joinToString("\n").trimEnd())
+        // The sidecar is optional: older releases (e.g. 2.7.6) have no notes
+        // hash, so a missing sidecar parses with an empty checksumUrl and the
+        // download step then refuses the unverifiable update. When present it
+        // is validated exactly as before.
+        val checksumUrl = if (selected.any { it.opt("name") == UPDATE_CHECKSUM }) {
+            val (url, size) = asset(UPDATE_CHECKSUM, CHECKSUM_BYTES.toLong())
+            if (size != CHECKSUM_BYTES.toLong()) throw InvalidAssets()
+            url
+        } else ""
+        return LatestRelease(tag.removePrefix("v"), code, apkUrl, apkSize, checksumUrl,
+            lines.dropLast(1 + hashCount).joinToString("\n").trimEnd(), sha256)
     }
 
     fun isNewer(remoteVersionCode: Long, installedVersionCode: Long): Boolean =

@@ -30,7 +30,7 @@ Matrix ships **one universal APK**, with no separate CPU-specific downloads.
 
 This source targets **2.7.6** on the stable channel (versionCode **155**).
 
-1. Open the [latest release](https://github.com/bitmere/matrix-launcher/releases/latest) and download its optimized signed APK and SHA-256 checksum.
+1. Open the [latest release](https://github.com/bitmere/matrix-launcher/releases/latest) and download its optimized signed APK. The SHA-256 is in the release notes.
 2. Transfer the APK to your TV, open it with an installer/file manager, and allow installation from that source when Android asks.
 3. Install and open **Matrix Launcher**. Installation alone does not change your Home app or enable accessibility services.
 

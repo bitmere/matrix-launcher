@@ -15,10 +15,8 @@ import urllib.request
 REPO = 'bitmere/matrix-launcher'
 PIN = 'a21fc7cb0cf12ab08744e03a84fc45be7fd50aafb7397f054d250ce1a5151b9b'
 APK = 'Matrix-Launcher.apk'
-CHECKSUM = APK + '.sha256'
-ASSETS = (APK, CHECKSUM)
+ASSETS = (APK,)
 MAX_APK_BYTES = 256 * 1024 * 1024
-CHECKSUM_BYTES = 64 + 2 + len(APK) + 1
 
 
 def require(condition, message):
@@ -61,6 +59,8 @@ def metadata(tag):
     notes = match[1].strip()
     require(not any(line.lstrip().lower().startswith('android-version-code') for line in notes.splitlines()),
             'Reviewed notes contain a version trailer')
+    require(not any(line.lstrip().startswith('SHA-256:') for line in notes.splitlines()),
+            'Reserved SHA-256 marker in changelog')
     notes += f'\n\nAndroid-Version-Code: {raw_code}'
     return dict(versionName=version, versionCode=int(raw_code), prerelease=channel == 'beta', notes=notes)
 
@@ -130,20 +130,24 @@ def listing(path):
     raise ValueError('GitHub pagination limit exceeded')
 
 
-def validate_release(release, meta, tag, source):
+def validate_release(release, meta, tag, source, expected_sha=None):
     require(isinstance(release, dict), 'Missing or invalid release response')
     require(type(release.get('id')) is int and release['id'] > 0, 'Invalid release ID')
     require(type(release.get('draft')) is bool and type(release.get('prerelease')) is bool, 'Invalid release flags')
     require(release.get('target_commitish') == source, 'Release source metadata mismatch')
     pending = release['draft'] and re.fullmatch(r'untagged-[A-Za-z0-9]+', str(release.get('tag_name')))
     require((release.get('tag_name') == tag or pending) and release['prerelease'] == meta['prerelease'], 'Release tag/channel mismatch')
-    require(release.get('name') == f'Matrix Launcher {tag}' and isinstance(release.get('body'), str)
-            and release['body'].strip() == meta['notes'].strip(), 'Release notes/title mismatch')
+    body = release.get('body')
+    require(release.get('name') == f'Matrix Launcher {tag}' and isinstance(body, str), 'Release notes/title mismatch')
+    sha = sha256_from_notes(body) if expected_sha is None else expected_sha
+    expected_notes = meta['notes'] if sha is None else notes_with_sha256(meta['notes'], sha)
+    require(body.replace('\r\n', '\n').rstrip('\n') == expected_notes.replace('\r\n', '\n').rstrip('\n'),
+            'Release notes/title mismatch')
     require(run('git', 'rev-parse', f'refs/tags/{tag}^{{commit}}') == source, 'Release source mismatch')
     return release
 
 
-def release_state(meta, tag, source, releases=None):
+def release_state(meta, tag, source, releases=None, expected_sha=None):
     # GET-by-tag is documented for published releases. Draft URLs may be untagged-*.
     if releases is None:
         releases = listing(repo_path() + '/releases')
@@ -153,7 +157,7 @@ def release_state(meta, tag, source, releases=None):
     require(len(matches) <= 1, 'Ambiguous releases for tag; refusing mutation')
     if not matches:
         return None
-    release = validate_release(matches[0], meta, tag, source)
+    release = validate_release(matches[0], meta, tag, source, expected_sha)
     return dict(release, assets=release_assets(release['id']))
 
 
@@ -181,10 +185,13 @@ def recover(meta, tag, source, work):
     apk = next((a for a in release['assets'] if a['name'] == 'Matrix-Launcher.apk'), None) if release else None
     if apk:
         download_asset(apk, work / APK)
+        sha = sha256_from_notes(release['body'])
+        require(release['draft'] or sha is not None, 'Published release missing notes SHA-256')
+        if sha is not None:
+            require(sha == digest(work / APK), 'Recovered notes SHA-256 mismatch')
     elif release:
         require(release['draft'], 'Published release missing APK; refusing rebuild')
-        require(not any(a['name'] == 'Matrix-Launcher.apk.sha256' for a in release['assets']),
-                'Draft checksum exists without APK; refusing rebuild')
+        require(not release['assets'], 'Draft has assets but no APK; refusing divergent rebuild')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
         output.write(f'reuse={str(apk is not None).lower()}\n')
 
@@ -220,16 +227,10 @@ def verify_apk(meta, apk):
     require(not re.search(r'^application-debuggable', badging, re.M), 'Debuggable release rejected')
 
 
-def checksum_line(sha):
-    return f'{sha}  {APK}\n'.encode('ascii')
-
-
 def verified_checksum(work):
     apk = work / APK
     require(0 < apk.stat().st_size <= MAX_APK_BYTES, 'Invalid APK size')
-    sha = digest(apk)
-    require((work / CHECKSUM).read_bytes() == checksum_line(sha), 'Local checksum differs')
-    return sha
+    return digest(apk)
 
 
 def guard(releases, version_code):
@@ -249,6 +250,28 @@ def release_code(body):
     return int(match[1])
 
 
+def sha256_from_notes(body):
+    require(isinstance(body, str), 'Invalid release body')
+    lines = body.replace('\r\n', '\n').rstrip('\n').split('\n')
+    count = sum(line.lstrip().startswith('SHA-256:') for line in lines)
+    if count == 0:
+        return None
+    release_code(body)
+    match = re.fullmatch(r'SHA-256: ([0-9a-f]{64})', lines[-2]) if len(lines) >= 2 else None
+    require(count == 1 and match is not None, 'Invalid SHA-256 line in release notes')
+    return match[1]
+
+
+def notes_with_sha256(notes, sha):
+    require(isinstance(sha, str) and re.fullmatch(r'[0-9a-f]{64}', sha), 'Invalid SHA-256 digest')
+    release_code(notes)
+    require(sha256_from_notes(notes) is None, 'Release notes already contain SHA-256')
+    body = notes.replace('\r\n', '\n')
+    stripped = body.rstrip('\n')
+    prefix, separator, trailer = stripped.rpartition('\n')
+    return f'{prefix}{separator}SHA-256: {sha}\n{trailer}' + body[len(stripped):]
+
+
 def check_assets(release, work):
     for name in ASSETS:
         asset = next((a for a in release['assets'] if a['name'] == name), None)
@@ -259,20 +282,20 @@ def check_assets(release, work):
 
 
 def publish(meta, tag, source, work):
-    verified_checksum(work)
+    sha = verified_checksum(work)
     releases = listing(repo_path() + '/releases')
     guard(releases, meta['versionCode'])
-    release = release_state(meta, tag, source, releases)
+    release = release_state(meta, tag, source, releases, sha)
     if release is None:
         try:
             # Capture the ID directly. Never interpret gh's human-facing release URL.
             release = api(repo_path() + '/releases', 'POST', dict(tag_name=tag, target_commitish=source,
-                          name=f'Matrix Launcher {tag}', body=meta['notes'], draft=True, prerelease=meta['prerelease']))
-            validate_release(release, meta, tag, source)
+                          name=f'Matrix Launcher {tag}', body=notes_with_sha256(meta['notes'], sha), draft=True, prerelease=meta['prerelease']))
+            validate_release(release, meta, tag, source, sha)
             release = dict(release, assets=release_assets(release['id']))
         except (APIError, subprocess.TimeoutExpired):
             # Creation may have succeeded despite a lost response, or another writer won.
-            release = release_state(meta, tag, source)
+            release = release_state(meta, tag, source, expected_sha=sha)
             if release is None:
                 raise
     release_id = release['id']
@@ -283,7 +306,7 @@ def publish(meta, tag, source, work):
             download_asset(asset, existing)
             require(existing.read_bytes() == (work / asset['name']).read_bytes(), 'Existing release asset differs; never overwrite')
     if release['draft'] and release['tag_name'] != tag:
-        release = validate_release(api(f'{repo_path()}/releases/{release_id}', 'PATCH', {'tag_name': tag}), meta, tag, source)
+        release = validate_release(api(f'{repo_path()}/releases/{release_id}', 'PATCH', {'tag_name': tag}), meta, tag, source, sha)
         release = dict(release, assets=release_assets(release_id))
     for name in ASSETS:
         asset = next((a for a in release['assets'] if a['name'] == name), None)
@@ -297,7 +320,7 @@ def publish(meta, tag, source, work):
                 assets = release_assets(release_id)
                 require(any(a['name'] == name for a in assets), 'Upload failed; no completed asset found')
     # Verify stored bytes, including newly uploaded assets, before making a draft public.
-    fresh = validate_release(api(f'{repo_path()}/releases/{release_id}'), meta, tag, source)
+    fresh = validate_release(api(f'{repo_path()}/releases/{release_id}'), meta, tag, source, sha)
     require(fresh['id'] == release_id, 'Release ID changed')
     fresh = dict(fresh, assets=release_assets(release_id))
     check_assets(fresh, work)
@@ -308,7 +331,7 @@ def publish(meta, tag, source, work):
             published = api(endpoint, 'PATCH', {'draft': False, 'tag_name': tag})
         except (APIError, subprocess.TimeoutExpired):
             published = api(endpoint)
-        validate_release(published, meta, tag, source)
+        validate_release(published, meta, tag, source, sha)
         require(published['id'] == release_id and published['draft'] is False and published['tag_name'] == tag, 'Release remained a draft')
 
 
@@ -345,9 +368,11 @@ def anonymous(meta, tag, work):
             and release.get('name') == f'Matrix Launcher {tag}' and release.get('draft') is False
             and release.get('prerelease') is meta['prerelease'], 'Public release metadata mismatch')
     require(release_code(release.get('body')) == meta['versionCode'], 'Public release version mismatch')
+    require(sha256_from_notes(release.get('body')) == sha, 'Public notes SHA-256 differs')
     assets = release.get('assets')
     require(isinstance(assets, list) and all(isinstance(asset, dict) for asset in assets),
             'Invalid public asset list')
+    require(len(assets) == 1 and assets[0].get('name') == APK, 'Unexpected public asset')
     selected = []
     for name in ASSETS:
         matches = [asset for asset in assets if asset.get('name') == name]
@@ -381,7 +406,6 @@ def main():
         recover(meta, tag, source, work)
     elif args.command == 'verify':
         verify_apk(meta, apk)
-        (work / CHECKSUM).write_bytes(checksum_line(digest(apk)))
     elif args.command == 'publish':
         publish(meta, tag, source, work)
     else:

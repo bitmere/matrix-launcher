@@ -187,7 +187,6 @@ jobs:
           name: matrix-launcher-release-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/matrix-release/Matrix-Launcher.apk
-            ${{ runner.temp }}/matrix-release/Matrix-Launcher.apk.sha256
           if-no-files-found: error
           retention-days: 7
       - name: Recheck remote approved tag and main before publication
