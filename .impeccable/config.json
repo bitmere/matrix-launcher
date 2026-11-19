@@ -1,0 +1,1 @@
+{"detector":{"extensions":[{"engine":"text","ext":".kt"}]},"hook":{"enabled":true,"limits":{"maxChars":8000,"maxFindings":5}}}

@@ -19,3 +19,7 @@ build.local.properties
 
 # Generated public-launch artwork; device screenshots remain ignored.
 !/docs/images/*.png
+
+# Impeccable: shared hook config is committed; local consent + cache stay local.
+.impeccable/*
+!.impeccable/config.json
