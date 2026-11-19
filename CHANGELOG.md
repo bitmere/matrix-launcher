@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.9 — stable
+
+- Impeccable design setup (PR #6): vendored skill (v4.10.0), Codex design hooks with a `.kt` detector, product context and design tokens in PRODUCT.md / DESIGN.md. Config/setup only; no app code changed.
+- Tests: 786 JVM tests, all passing; lint 0 errors, 4 warnings.
+
 ## 2.7.8 — stable
 
 - Impeccable P1 fixes (PR #4): AI search now shows a Siri-style orb (56dp luminous sphere, five-colour sweep swirl, one rotation per 6s, gradient confined inside the orb); theme changes apply live without restarting the app; a Cinemeta outage now says "Catalog unavailable — check connection" instead of "no results"; focused cards get a solid 2dp theme ring and a bolder title, and posters have loading and error states.
