@@ -15,21 +15,21 @@ internal object CinemetaClient {
     /**
      * Searches Cinemeta catalog for a given media type ("movie" or "series") and query.
      */
-    fun searchCatalog(type: String, query: String): List<MediaCard> = runCatching {
+    fun searchCatalog(type: String, query: String): Result<List<MediaCard>> = runCatching {
         val clean = query.trim()
         if (clean.isBlank()) return@runCatching emptyList()
         val encoded = Uri.encode(clean)
         val url = "$BASE_URL/catalog/$type/top/search=$encoded.json"
         val conn = PersonalImages.connect(url, null)
         try {
-            if (conn.responseCode == 200) {
-                val json = conn.inputStream.use { JSONObject(PersonalImages.text(it, 512 * 1024)) }
-                parseCards(json, type)
-            } else emptyList()
+            val code = conn.responseCode
+            check(code == 200) { "Cinemeta catalog returned HTTP $code" }
+            val json = conn.inputStream.use { JSONObject(PersonalImages.text(it, 512 * 1024)) }
+            parseCards(json, type)
         } finally {
             conn.disconnect()
         }
-    }.getOrDefault(emptyList())
+    }
 
     /**
      * Fetches top trending metas for "movie" or "series", keeping at most

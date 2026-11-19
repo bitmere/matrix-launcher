@@ -2,6 +2,7 @@ package com.matrix.launcher
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.background
@@ -21,9 +22,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -52,7 +56,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
 /** Geometry only: reused decoded posters should not restart with an incorrect fitted rim. */
-private val artworkAspects = android.util.LruCache<String, Float>(128)
+private val artworkAspects by lazy { android.util.LruCache<String, Float>(128) }
 
 /** Seed from the same bounded memory cache; only a miss schedules the shared IO loader. */
 @Composable
@@ -115,12 +119,41 @@ private fun Modifier.tvCardClickable(
         }
 }
 
+internal fun focusedCardBorder(onSurface: Color): Border = Border(
+    BorderStroke(MatrixLayout.focusOutlineWidth, onSurface),
+    MatrixLayout.focusOutlineOffset,
+    MatrixCardDefaults.artworkShape
+)
+
+internal fun cardTitleColor(focused: Boolean, onSurface: Color, onSurfaceVariant: Color): Color =
+    if (focused) onSurface else onSurfaceVariant
+
+internal fun cardTitleWeight(focused: Boolean): FontWeight =
+    if (focused) FontWeight.Medium else FontWeight.Normal
+
+internal enum class PosterState { NoImage, Loading, Loaded, Error }
+
+internal enum class PosterOutcome { Loading, Loaded, Failed }
+
+internal fun posterStateFor(hasImageUrl: Boolean, outcome: PosterOutcome?): PosterState {
+    if (!hasImageUrl) return PosterState.NoImage
+    return when (outcome) {
+        null, PosterOutcome.Loading -> PosterState.Loading
+        PosterOutcome.Loaded -> PosterState.Loaded
+        PosterOutcome.Failed -> PosterState.Error
+    }
+}
+
 internal object MatrixCardDefaults {
     val artworkShape get() = RoundedCornerShape(MatrixLayout.cardCorner)
     @Composable
     fun shape() = CardDefaults.shape(RectangleShape)
     @Composable
-    fun border() = CardDefaults.border(border = Border.None, focusedBorder = Border.None, pressedBorder = Border.None)
+    fun border() = CardDefaults.border(
+        border = Border.None,
+        focusedBorder = focusedCardBorder(MaterialTheme.colorScheme.onSurface),
+        pressedBorder = Border.None
+    )
     @Composable
     fun scale() = CardDefaults.scale(focusedScale = MatrixLayout.cardFocusScale)
     @Composable
@@ -153,6 +186,8 @@ internal fun MatrixAppCard(app: LaunchApp, repository: ComposeHomeRepository, wi
             }
         },
         title = { if (showTitle) Text(app.title, Modifier.fillMaxWidth().padding(top = 6.dp, start = 8.dp, end = 8.dp),
+            color = cardTitleColor(focused, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.onSurfaceVariant),
+            fontWeight = cardTitleWeight(focused),
             style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     )
 }
@@ -164,7 +199,9 @@ internal fun MatrixActionCard(title: String, icon: Int, width: Dp, click: () -> 
         image = { MatrixArtwork(16f / 9f, focused) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(painterResource(icon), null, Modifier.size(40.dp))
-                Text(title, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
+                Text(title, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp),
+                    color = cardTitleColor(focused, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.onSurfaceVariant),
+                    fontWeight = cardTitleWeight(focused))
             }
         } }, title = {}, colors = MatrixCardDefaults.colors(), shape = MatrixCardDefaults.shape(), border = MatrixCardDefaults.border())
 }
@@ -209,6 +246,8 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
     var focused by remember { mutableStateOf(false) }
     val frameAspect = if (card.portrait) 2f / 3f else 16f / 9f
     var sourceAspect by remember(card.image) { mutableFloatStateOf(artworkAspects.get(card.image) ?: frameAspect) }
+    var posterOutcome by remember(card.image) { mutableStateOf<PosterOutcome?>(null) }
+    val posterState = posterStateFor(card.image.isNotBlank(), posterOutcome)
     val context = LocalContext.current
     val request = remember(context, card.image, imageWidth, imageHeight) {
         ImageRequest.Builder(context).data(card.image).size(imageWidth, imageHeight).crossfade(false).allowRgb565(true).build()
@@ -227,12 +266,18 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
                 if (card.image.isNotBlank()) AsyncImage(
                     model = request,
                     contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize(),
+                    onLoading = { posterOutcome = PosterOutcome.Loading },
                     onSuccess = {
                         val aspect = ArtworkFit.aspect(it.result.drawable.intrinsicWidth, it.result.drawable.intrinsicHeight, frameAspect)
                         artworkAspects.put(card.image, aspect)
                         sourceAspect = aspect
-                    }
+                        posterOutcome = PosterOutcome.Loaded
+                    },
+                    onError = { posterOutcome = PosterOutcome.Failed }
                 ) else Image(painterResource(R.drawable.ic_apps), null, Modifier.align(Alignment.Center).size(32.dp))
+                if (posterState == PosterState.Loading || posterState == PosterState.Error) {
+                    PosterStateMark(posterState, Modifier.fillMaxSize())
+                }
                 if (card.mediaType.isNotBlank()) Text(card.mediaType, Modifier.align(Alignment.TopStart).padding(8.dp)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = .94f), MatrixControlStyle.shape)
                     .padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall,
@@ -286,6 +331,8 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
         },
         title = { Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
             Text(card.title, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
+                color = cardTitleColor(focused, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.onSurfaceVariant),
+                fontWeight = cardTitleWeight(focused),
                 textAlign = TextAlign.Center, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val metaText = remember(card.metadata) { card.metadata.replace("\n", " · ").trim() }
             if (metaText.isNotBlank()) Text(metaText, Modifier.fillMaxWidth().padding(top = 3.dp),
@@ -296,6 +343,49 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
                 textAlign = TextAlign.Center, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } }
     )
+}
+
+@Composable
+private fun PosterStateMark(state: PosterState, modifier: Modifier = Modifier) {
+    val isError = state == PosterState.Error
+    val colorScheme = MaterialTheme.colorScheme
+    val glyphColor = colorScheme.onSurface.copy(alpha = if (isError) 0.60f else 0.30f)
+    Canvas(modifier) {
+        if (!isError) drawRect(colorScheme.surface)
+
+        val extent = size.minDimension
+        val frame = Size(extent * 0.46f, extent * 0.36f)
+        val origin = center - Offset(frame.width / 2, frame.height / 2)
+        val stroke = 2.dp.toPx()
+        fun framePoint(x: Float, y: Float) = origin + Offset(frame.width * x, frame.height * y)
+
+        drawRoundRect(
+            color = glyphColor,
+            topLeft = origin,
+            size = frame,
+            cornerRadius = CornerRadius(extent * 0.035f),
+            style = Stroke(stroke)
+        )
+        drawCircle(glyphColor, radius = extent * 0.035f, center = framePoint(0.24f, 0.26f))
+        val mountain = Path().apply {
+            val start = framePoint(0.12f, 0.88f)
+            val peak = framePoint(0.58f, 0.43f)
+            val end = framePoint(0.88f, 0.88f)
+            moveTo(start.x, start.y)
+            lineTo(peak.x, peak.y)
+            lineTo(end.x, end.y)
+        }
+        drawPath(mountain, glyphColor, style = Stroke(stroke, cap = StrokeCap.Round))
+        if (isError) {
+            drawLine(
+                glyphColor,
+                start = framePoint(-0.10f, 1.10f),
+                end = framePoint(1.10f, -0.10f),
+                strokeWidth = 2.5.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+    }
 }
 
 /** A quiet translucent track keeps the artwork visible without a second outline. */

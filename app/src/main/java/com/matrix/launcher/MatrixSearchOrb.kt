@@ -1,285 +1,226 @@
 package com.matrix.launcher
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.sin
 
+/**
+ * The search working indicator: a Siri-style luminous orb.
+ *
+ * What it looks like: a soft sphere on a dark base, filled with a
+ * slowly rotating multicolour swirl (blue, cyan, purple, pink,
+ * orange) around a bright white core, finished with a faint rim so
+ * it reads on the dark card. The reference is Apple's Siri orb —
+ * a spherical, translucent shape with flowing washes of colour and
+ * a bright centre — rebuilt fresh in Compose; no Apple asset is
+ * copied or embedded.
+ *
+ * DELIBERATE OVERRIDE, per the user's explicit direction
+ * (2026-11-19 21:51 IST: "it should be like apple siri orb"):
+ * the multicolour gradient is allowed INSIDE this orb only. The
+ * no-ai-slop banned list (gradient blobs, glowing orbs, rainbow
+ * ribbons, gradient borders) is otherwise still in force everywhere
+ * else in the app. The swirl colours below are Siri identity
+ * colours, not Matrix theme tokens, and are named as such — a
+ * deliberate redesign choice, not a token that a custom theme
+ * should recolour. Everything outside the orb (the quiet progress
+ * card, the sentence-case status, the last-4 steps) stays
+ * token-quiet.
+ *
+ * Contained: every layer is drawn inside one clipPath circle, so
+ * the swirl and the inner glow never bleed across the card. There
+ * is no outer glow and no spill beyond the orb's own radius.
+ *
+ * Cheap to draw: one Canvas, four draw calls (dark base, rotating
+ * sweep-gradient swirl, bright core, thin rim), one slow rotation,
+ * no blur layers, no scale or pulse. It only exists while the
+ * progress card is shown, so the animation runs only while a
+ * search is actually running.
+ *
+ * Deliberately not the old 150dp showpiece (8 draw layers, 3
+ * competing animations) and not the 28dp token ring that replaced
+ * it — the user redirected from the ring to the Siri look.
+ */
 
-/** Siri orb visual, split out of MatrixSearchScreen.kt (P0/P1 split); behaviour unchanged. */
+/** One full turn takes 6s: a slow drift, not a spin. */
+const val ORB_ROTATION_PERIOD_MS = 6000L
+
+/** The orb is big enough for the swirl to read at 10 feet, never a hero. */
+val ORB_SIZE_DP: Dp = 56.dp
+
+/** Thin rim: definition on the dark card, not a border. */
+val ORB_RIM_DP: Dp = 1.dp
+
+/** Bright-core alpha at the centre of the highlight. */
+const val ORB_CORE_ALPHA = 0.55f
+
+/** Rim alpha: faint, so the orb stays soft. */
+const val ORB_RIM_ALPHA = 0.28f
+
+/** Inner-glow alpha at the orb edge: a soft wash, never a halo. */
+const val ORB_EDGE_GLOW_ALPHA = 0.10f
+
+/**
+ * Containment contract: the glow radius is a fraction of the orb
+ * radius and never exceeds it — nothing is drawn outside the orb.
+ */
+const val ORB_GLOW_RADIUS_FRACTION = 1.0f
+
+/** The bright core covers just over half the orb radius. */
+const val ORB_CORE_RADIUS_FRACTION = 0.55f
+
+// Siri identity colours. These are NOT Matrix theme tokens: they are
+// the Siri look the user asked for, fixed by design. A custom
+// theme.json must not recolour them.
+val SIRI_BLUE: Color = Color(0xFF3385FF)
+val SIRI_CYAN: Color = Color(0xFF2ED9F2)
+val SIRI_PURPLE: Color = Color(0xFF9E4DFF)
+val SIRI_PINK: Color = Color(0xFFFF458C)
+val SIRI_ORANGE: Color = Color(0xFFFF9E33)
+
+/** Dark base so the swirl reads as luminous, like the real orb. */
+val ORB_BASE_CENTER: Color = Color(0xFF1B2340)
+val ORB_BASE_EDGE: Color = Color(0xFF0A0E1F)
+
+/**
+ * The swirl palette in sweep order. The first colour repeats at the
+ * end so the sweep gradient wraps seamlessly with no hard seam.
+ * Pure, so the palette contract is unit-testable without composing.
+ */
+fun orbSwirlColors(): List<Color> = listOf(
+    SIRI_BLUE,
+    SIRI_CYAN,
+    SIRI_PURPLE,
+    SIRI_PINK,
+    SIRI_ORANGE,
+    SIRI_BLUE
+)
+
+/** The base disc gradient, centre to edge. */
+fun orbBaseColors(): List<Color> = listOf(ORB_BASE_CENTER, ORB_BASE_EDGE)
+
+/**
+ * Rotation angle for the single slow swirl: 0 at the start of a
+ * turn, 360 at the end, wrapping cleanly. Pure, so the motion
+ * contract is unit-testable without composing anything.
+ */
+fun orbRotationDegrees(elapsedMs: Long): Float {
+    val inTurn = Math.floorMod(elapsedMs, ORB_ROTATION_PERIOD_MS)
+    return inTurn.toFloat() / ORB_ROTATION_PERIOD_MS.toFloat() * 360f
+}
+
+/**
+ * Bright-core centre: offset up and left from the orb centre, so
+ * the light reads as coming from above, like the real orb.
+ * [radiusPx] is the orb radius in pixels.
+ */
+fun orbCoreCenter(center: Offset, radiusPx: Float): Offset =
+    Offset(center.x - radiusPx * 0.25f, center.y - radiusPx * 0.28f)
+
+/** Bright-core radius in pixels for an orb of [radiusPx]. */
+fun orbCoreRadius(radiusPx: Float): Float = radiusPx * ORB_CORE_RADIUS_FRACTION
+
 @Composable
-internal fun SiriGlowingOrb(
-    modifier: Modifier = Modifier,
-    sizeDp: androidx.compose.ui.unit.Dp = 160.dp
+fun MatrixSearchOrb(
+    modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "siriOrb")
-
-    // Continuous phase for rolling liquid water flow (0..2π LinearEasing)
-    val phase by infiniteTransition.animateFloat(
+    // The one motion in this component: a single constant-speed rotation
+    // of the sweep-gradient swirl. Nothing else moves.
+    val transition = rememberInfiniteTransition(label = "searchOrb")
+    val rotation by transition.animateFloat(
         initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3800, easing = LinearEasing),
+            animation = tween(ORB_ROTATION_PERIOD_MS.toInt(), easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "waterFlowPhase"
+        label = "searchOrbRotation"
     )
-
-    // Gentle organic breathing scale (zero pause at reversal)
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.97f,
-        targetValue = 1.03f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "orbScale"
-    )
-
-    // Soft water refraction core intensity
-    val coreGlow by infiniteTransition.animateFloat(
-        initialValue = 0.70f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "coreGlow"
-    )
-
-    Canvas(
-        modifier = modifier
-            .size(sizeDp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-    ) {
-        val width = size.width
-        val height = size.height
-        val center = Offset(width / 2f, height / 2f)
-        val baseRadius = (width / 2f) * 0.70f
-        val diameter = baseRadius * 2f
-        val left = center.x - baseRadius
-        val right = center.x + baseRadius
-        val bottom = center.y + baseRadius
-
-        // --- Layer 1: Ethereal Water Mist Ambient Bloom (Soft calm aura) ---
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0x3038BDF8).copy(alpha = 0.35f * coreGlow),
-                    Color(0x18818CF8).copy(alpha = 0.22f * coreGlow),
-                    Color(0x0C2DD4BF).copy(alpha = 0.12f),
-                    Color.Transparent
-                ),
-                center = center,
-                radius = baseRadius * 1.50f
-            ),
-            radius = baseRadius * 1.50f,
-            center = center
-        )
-
-        // Clip the internal rolling liquid water waves to a smooth circular sphere
-        val sphereClip = Path().apply {
-            addOval(Rect(left, center.y - baseRadius, right, bottom))
+    Canvas(modifier = modifier.size(ORB_SIZE_DP)) {
+        val radius = size.minDimension / 2f
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val circle = Path().apply {
+            addOval(Rect(center = center, radius = radius))
         }
-
-        clipPath(sphereClip) {
-            // --- Layer 2: Deep Aquatic Pool Base ---
+        // Every layer is clipped to the orb circle: the swirl and the
+        // inner glow live inside the orb's bounds only.
+        clipPath(circle) {
+            // 1. Dark base disc.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = orbBaseColors(),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+            // 2. The swirl: a sweep gradient of the Siri palette,
+            // rotating once per turn. This is the only moving layer.
+            rotate(degrees = rotation, pivot = center) {
+                drawCircle(
+                    brush = Brush.sweepGradient(
+                        colors = orbSwirlColors(),
+                        center = center
+                    ),
+                    radius = radius,
+                    center = center,
+                    alpha = 0.9f
+                )
+            }
+            // 3. Bright core: a soft white bloom, offset up-left.
+            val coreCenter = orbCoreCenter(center, radius)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF0F172A),
-                        Color(0xFF0C4A6E),
-                        Color(0xFF0369A1)
-                    ),
-                    center = center,
-                    radius = baseRadius
-                ),
-                radius = baseRadius,
-                center = center
-            )
-
-            // --- Layer 3: Rolling Water Wave 1 (Lagoon Blue / Seafoam) ---
-            val wave1Path = Path().apply {
-                moveTo(left, bottom)
-                var x = left
-                val step = 4f
-                val baseY = center.y + baseRadius * 0.10f
-                val amplitude = baseRadius * 0.14f
-                while (x <= right) {
-                    val progress = (x - left) / diameter
-                    val y = baseY + (amplitude * sin((progress * 2.0 * Math.PI) + phase)).toFloat()
-                    lineTo(x, y)
-                    x += step
-                }
-                lineTo(right, bottom)
-                close()
-            }
-            drawPath(
-                path = wave1Path,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x952DD4BF),
-                        Color(0x750284C7),
-                        Color(0x500F172A)
-                    ),
-                    startY = center.y - baseRadius * 0.1f,
-                    endY = bottom
-                )
-            )
-
-            // --- Layer 4: Rolling Water Wave 2 (Periwinkle / Soft Lavender liquid current) ---
-            val wave2Path = Path().apply {
-                moveTo(left, bottom)
-                var x = left
-                val step = 4f
-                val baseY = center.y - baseRadius * 0.08f
-                val amplitude = baseRadius * 0.16f
-                while (x <= right) {
-                    val progress = (x - left) / diameter
-                    // Counter-flowing wave with π/2 phase offset
-                    val y = baseY + (amplitude * sin((progress * 2.0 * Math.PI) - phase + (Math.PI / 2.0))).toFloat()
-                    lineTo(x, y)
-                    x += step
-                }
-                lineTo(right, bottom)
-                close()
-            }
-            drawPath(
-                path = wave2Path,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x88818CF8),
-                        Color(0x5038BDF8),
+                        Color.White.copy(alpha = ORB_CORE_ALPHA),
                         Color.Transparent
                     ),
-                    startY = center.y - baseRadius * 0.3f,
-                    endY = bottom
-                )
-            )
-
-            // --- Layer 5: Rolling Water Crest 3 (Soft Rosewater / Sky Water Ripple) ---
-            val wave3Path = Path().apply {
-                moveTo(left, bottom)
-                var x = left
-                val step = 4f
-                val baseY = center.y + baseRadius * 0.22f
-                val amplitude = baseRadius * 0.10f
-                while (x <= right) {
-                    val progress = (x - left) / diameter
-                    // Faster harmonic liquid ripple (k=2)
-                    val y = baseY + (amplitude * sin((progress * 4.0 * Math.PI) + phase)).toFloat()
-                    lineTo(x, y)
-                    x += step
-                }
-                lineTo(right, bottom)
-                close()
-            }
-            drawPath(
-                path = wave3Path,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x75F472B6),
-                        Color(0x4038BDF8),
-                        Color.Transparent
-                    ),
-                    startY = center.y,
-                    endY = bottom
-                )
-            )
-
-            // Delicate shimmering crest line along Wave 2
-            val crestPath = Path().apply {
-                var x = left
-                val step = 4f
-                val baseY = center.y - baseRadius * 0.08f
-                val amplitude = baseRadius * 0.16f
-                var first = true
-                while (x <= right) {
-                    val progress = (x - left) / diameter
-                    val y = baseY + (amplitude * sin((progress * 2.0 * Math.PI) - phase + (Math.PI / 2.0))).toFloat()
-                    if (first) { moveTo(x, y); first = false } else { lineTo(x, y) }
-                    x += step
-                }
-            }
-            drawPath(
-                path = crestPath,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0x30E0F2FE),
-                        Color(0xB0E0F2FE),
-                        Color(0x30E0F2FE)
-                    ),
-                    startX = left,
-                    endX = right
+                    center = coreCenter,
+                    radius = orbCoreRadius(radius)
                 ),
-                style = Stroke(width = 1.2.dp.toPx())
+                radius = orbCoreRadius(radius),
+                center = coreCenter
             )
-
-            // --- Layer 6: Luminous Water Refraction Center Bloom ---
+            // 4. Soft inner wash towards the edge: the gentle glow,
+            // kept inside the orb.
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.88f * coreGlow),
-                        Color(0xA038BDF8).copy(alpha = 0.50f * coreGlow),
-                        Color(0x30818CF8).copy(alpha = 0.20f),
-                        Color.Transparent
+                        Color.Transparent,
+                        Color.White.copy(alpha = ORB_EDGE_GLOW_ALPHA)
                     ),
                     center = center,
-                    radius = baseRadius * 0.45f
+                    radius = radius * ORB_GLOW_RADIUS_FRACTION
                 ),
-                radius = baseRadius * 0.45f,
+                radius = radius * ORB_GLOW_RADIUS_FRACTION,
                 center = center
             )
         }
-
-        // --- Layer 7: Micro-thin Glass Meniscus Rim (Delicate 1dp) ---
+        // 5. Thin rim, on the clipped edge, for definition on the card.
         drawCircle(
-            brush = Brush.sweepGradient(
-                colors = listOf(
-                    Color(0x4038BDF8),
-                    Color(0x25818CF8),
-                    Color(0x402DD4BF),
-                    Color(0x2038BDF8),
-                    Color(0x4038BDF8)
-                ),
-                center = center
-            ),
-            radius = baseRadius,
+            color = Color.White.copy(alpha = ORB_RIM_ALPHA),
+            radius = radius - ORB_RIM_DP.toPx() / 2f,
             center = center,
-            style = Stroke(width = 1.dp.toPx())
-        )
-
-        // --- Layer 8: Delicate Top Specular Water Droplet Crescent Sheen ---
-        drawOval(
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color(0x35FFFFFF),
-                    Color(0x0CFFFFFF),
-                    Color.Transparent
-                ),
-                start = Offset(center.x - baseRadius * 0.45f, center.y - baseRadius * 0.60f),
-                end = Offset(center.x + baseRadius * 0.25f, center.y - baseRadius * 0.15f)
-            ),
-            topLeft = Offset(center.x - baseRadius * 0.50f, center.y - baseRadius * 0.65f),
-            size = Size(baseRadius * 1.0f, baseRadius * 0.45f)
+            style = Stroke(width = ORB_RIM_DP.toPx())
         )
     }
 }

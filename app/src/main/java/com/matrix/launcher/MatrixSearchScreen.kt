@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -97,6 +96,7 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
         onDispose { operation.begin(); searchJob?.cancel(); inspection?.searchProvider = "none"; inspection?.searchResults = 0; inspection?.searchBusy = false }
     }
     val context = LocalContext.current
+    val catalogUnavailableText = stringResource(R.string.search_catalog_unavailable)
     var isListening by remember { mutableStateOf(false) }
     var recognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
     var voiceSessionId by remember { mutableIntStateOf(0) }
@@ -168,7 +168,11 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
             catch (failure: Exception) {
                 if (!operation.isCurrent(generation) || !currentCoroutineContext().isActive) return@launch
                 val detail = failure.localizedMessage?.takeIf { it.isNotBlank() } ?: failure.message
-                error = if (detail != null) detail else "Search unavailable. Check the connection, provider credential and API usage in Settings → Integrations."
+                error = if (failure is CatalogUnavailableException) {
+                    catalogUnavailableText
+                } else {
+                    if (detail != null) detail else "Search unavailable. Check the connection, provider credential and API usage in Settings → Integrations."
+                }
                 android.util.Log.e("MatrixSearch", "Search error for $selected: $detail", failure)
             } finally { if (operation.isCurrent(generation) && currentCoroutineContext().isActive) { busy = false; searchProgress = "" } }
         }
@@ -378,6 +382,8 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
             }
             if (voiceAvailable) {
                 if (isListening) {
+                    // Single theme accent for the listening glow; no hard-coded palette.
+                    val voiceAccent = MaterialTheme.colorScheme.primary
                     Box(
                         modifier = Modifier
                             .graphicsLayer {
@@ -394,9 +400,9 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                                 drawCircle(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            Color(0x3538BDF8).copy(alpha = 0.35f * pulseAlpha),
-                                            Color(0x208B5CF6).copy(alpha = 0.20f * pulseAlpha),
-                                            Color(0x10FF5E62).copy(alpha = 0.10f),
+                                            voiceAccent.copy(alpha = 0.35f * pulseAlpha),
+                                            voiceAccent.copy(alpha = 0.20f * pulseAlpha),
+                                            voiceAccent.copy(alpha = 0.10f),
                                             Color.Transparent
                                         ),
                                         center = Offset(cx, cy),
@@ -414,8 +420,8 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                                 drawCircle(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            Color(0x3000D2FF).copy(alpha = 0.30f * pulseAlpha),
-                                            Color(0x157C3AED).copy(alpha = 0.15f),
+                                            voiceAccent.copy(alpha = 0.30f * pulseAlpha),
+                                            voiceAccent.copy(alpha = 0.15f),
                                             Color.Transparent
                                         ),
                                         center = orbitOffset,
@@ -430,11 +436,11 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                                     drawCircle(
                                         brush = Brush.sweepGradient(
                                             colors = listOf(
-                                                Color(0x5038BDF8),
-                                                Color(0x308B5CF6),
-                                                Color(0x50FF5E62),
-                                                Color(0x308B5CF6),
-                                                Color(0x5038BDF8)
+                                                voiceAccent.copy(alpha = 0.31f),
+                                                voiceAccent.copy(alpha = 0.19f),
+                                                voiceAccent.copy(alpha = 0.31f),
+                                                voiceAccent.copy(alpha = 0.19f),
+                                                voiceAccent.copy(alpha = 0.31f)
                                             ),
                                             center = Offset(cx, cy)
                                         ),
@@ -540,16 +546,11 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 4.dp, vertical = 6.dp)
-                                    .background(Color(0xFF13192B), RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(MatrixLayout.panelCorner))
                                     .border(
                                         width = 1.dp,
-                                        brush = Brush.horizontalGradient(
-                                            listOf(
-                                                Color(0xFF38BDF8).copy(alpha = 0.45f),
-                                                Color(0xFF818CF8).copy(alpha = 0.45f)
-                                            )
-                                        ),
-                                        shape = RoundedCornerShape(12.dp)
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(MatrixLayout.panelCorner)
                                     )
                                     .padding(horizontal = 14.dp, vertical = 10.dp)
                             ) {
@@ -561,12 +562,12 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                                         Box(
                                             modifier = Modifier
                                                 .size(7.dp)
-                                                .background(Color(0xFF38BDF8), CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary, CircleShape)
                                         )
                                         Text(
-                                            text = "AI DISCOVERY & SYNTHESIS REPORT",
+                                            text = stringResource(R.string.search_ai_summary_title),
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = Color(0xFF38BDF8)
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                     Text(
@@ -670,7 +671,7 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                                     Text(
                                         text = "· Discovering live trends…",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = Color(0xFF00F0FF).copy(alpha = 0.8f)
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                                     )
                                 }
                             }
@@ -732,186 +733,100 @@ private fun MatrixSearchProgress(
     aiModel: String,
     aiProviderLabel: String
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "geminiSiriProgress")
-    val flowOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "flowOffset"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.65f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
     val isAi = provider == MatrixSearchProvider.AI
     val activeText = progress.ifBlank {
         if (isAi) "Consulting $aiModel ($aiProviderLabel)…" else "Searching ${provider.title}…"
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+    val colors = MaterialTheme.colorScheme
+    // Theme radius token (default 24dp), not the pill-shaped control shape:
+    // MatrixControlStyle.shape is RoundedCornerShape(50) for buttons.
+    val shape = RoundedCornerShape(MatrixLayout.panelCorner)
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        contentAlignment = Alignment.TopCenter
     ) {
-        if (isAi) {
-            // 1. Siri 3D Glowing Orb (Matching Reference Image)
-            SiriGlowingOrb(sizeDp = 150.dp)
-        }
-
-        // 2. Real-Time AI Streaming Console Card
-        Box(
+        Column(
             modifier = Modifier
                 .widthIn(max = 840.dp)
                 .fillMaxWidth(0.85f)
-                .background(Color(0xEE111524), RoundedCornerShape(18.dp))
-                .border(
-                    width = 1.5.dp,
-                    brush = Brush.horizontalGradient(
-                        listOf(
-                            Color(0xFF38BDF8).copy(alpha = 0.45f * pulseAlpha),
-                            Color(0xFF818CF8).copy(alpha = 0.45f * pulseAlpha)
-                        )
-                    ),
-                    shape = RoundedCornerShape(18.dp)
-                )
-                .padding(20.dp)
+                .background(colors.surfaceVariant, shape)
+                .border(1.dp, colors.onSurface.copy(alpha = 0.12f), shape)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                // Header: Live AI Status Indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(9.dp)
-                                .background(Color(0xFF00F0FF).copy(alpha = pulseAlpha), androidx.compose.foundation.shape.CircleShape)
-                        )
-                        Text(
-                            text = if (isAi) "LIVE AI REASONING STREAM" else "LIVE SEARCH",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF00F0FF)
-                        )
-                    }
-                    if (isAi) {
-                        Text(
-                            text = "$aiModel · $aiProviderLabel",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-
-                // Prominent Active Current Action
-                AnimatedContent(
-                    targetState = activeText,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = tween(220, delayMillis = 40)) +
-                            slideInVertically(animationSpec = tween(220, delayMillis = 40)) { h -> h / 2 })
-                            .togetherWith(fadeOut(animationSpec = tween(100)))
-                    },
-                    label = "activeStreamText"
-                ) { msg ->
+                    MatrixSearchOrb()
                     Text(
-                        text = "● $msg",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = stringResource(
+                            if (isAi) R.string.search_progress_ai_discovery else R.string.search_progress_searching
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.onSurface
                     )
                 }
-
-                // Chronological Live Step Stream (Latest 4 steps)
-                if (steps.size > 1) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0x40000000), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        val displaySteps = steps.takeLast(4)
-                        displaySteps.forEachIndexed { index, step ->
-                            val isLatest = index == displaySteps.lastIndex
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = if (isLatest) "▶" else "✓",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isLatest) Color(0xFF00F0FF) else Color(0xFF10B981)
-                                )
-                                Text(
-                                    text = step,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isLatest) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Gemini Live Harmonic Flow Ribbon (Dynamic, zero-recomposition draw-phase shader)
-                val ribbonColors = remember {
-                    listOf(
-                        Color(0xFF00F0FF),
-                        Color(0xFF3B82F6),
-                        Color(0xFF8B5CF6),
-                        Color(0xFFFF2E93),
-                        Color(0xFFFF8B3D),
-                        Color(0xFF10B981),
-                        Color(0xFF00F0FF)
+                if (isAi) {
+                    Text(
+                        text = "$aiModel · $aiProviderLabel",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onSurface.copy(alpha = 0.6f)
                     )
                 }
-                Box(
+            }
+
+            AnimatedContent(
+                targetState = activeText,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(220, delayMillis = 40)) +
+                        slideInVertically(animationSpec = tween(220, delayMillis = 40)) { h -> h / 2 })
+                        .togetherWith(fadeOut(animationSpec = tween(100)))
+                },
+                label = "activeStreamText"
+            ) { msg ->
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface
+                )
+            }
+
+            if (steps.size > 1) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .padding(top = 2.dp)
-                        .drawBehind {
-                            val w = size.width
-                            if (w <= 0f) return@drawBehind
-                            val flow = flowOffset
-                            val pulse = pulseAlpha
-                            val flowBrush = Brush.horizontalGradient(
-                                colors = ribbonColors,
-                                startX = (flow - 0.5f) * w,
-                                endX = (flow + 1.5f) * w,
-                                tileMode = androidx.compose.ui.graphics.TileMode.Repeated
+                        .background(colors.onSurface.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val displaySteps = steps.takeLast(4)
+                    displaySteps.forEachIndexed { index, step ->
+                        val isLatest = index == displaySteps.lastIndex
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (isLatest) "▶" else "✓",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isLatest) colors.primary else colors.onSurfaceVariant
                             )
-                            // Radiant halo
-                            drawRoundRect(
-                                brush = flowBrush,
-                                cornerRadius = CornerRadius(4.dp.toPx()),
-                                alpha = 0.35f * pulse
-                            )
-                            // Central energy line
-                            val lineH = 3.dp.toPx()
-                            val lineTop = (size.height - lineH) / 2f
-                            drawRoundRect(
-                                brush = flowBrush,
-                                topLeft = Offset(0f, lineTop),
-                                size = Size(w, lineH),
-                                cornerRadius = CornerRadius(1.5.dp.toPx())
+                            Text(
+                                text = step,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isLatest) colors.onSurface else colors.onSurface.copy(alpha = 0.65f),
+                                maxLines = 1
                             )
                         }
-                )
+                    }
+                }
             }
         }
     }

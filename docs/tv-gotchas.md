@@ -93,8 +93,8 @@ guessing. A change is proven only when the same tour, same gates,
   in `MatrixButton.kt`). The card stays highlighted (border + 1.015
   scale + backdrop); only the motion stops.
 - Verify with the bench idle window: ≤ 1 idle frame/s. The only other
-  infinite animations are in `MatrixSearchOrb.kt` and
-  `MatrixSearchScreen.kt` (search-only, not Home); the clock ticks
+  infinite animations are in `MatrixSearchScreen.kt` (voice listening
+  glow, search-only, not Home); the clock ticks
   once a minute; wallpaper rotation happens on Home load, not on a
   timer.
 

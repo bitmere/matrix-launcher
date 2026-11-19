@@ -15,6 +15,22 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+internal class CatalogUnavailableException(cause: Throwable? = null) : Exception("Catalog unavailable", cause)
+
+internal fun combineCatalogResults(
+    movies: Result<List<MediaCard>>,
+    series: Result<List<MediaCard>>,
+    query: String
+): Result<List<MediaCard>> {
+    val movieFailure = movies.exceptionOrNull()
+    if (movieFailure != null && series.isFailure) {
+        return Result.failure(movieFailure)
+    }
+    return Result.success(
+        CinemetaClient.rankResults(movies.getOrDefault(emptyList()), series.getOrDefault(emptyList()), query)
+    )
+}
+
 /** Compiled once: these patterns sit on search hot paths (D-04). Constructing a
  * Regex compiles the pattern, so building one per call cost thousands of
  * compilations per AI search. */
@@ -54,7 +70,8 @@ internal object LiveDynamicSuggestionsSource : DynamicSuggestionsSource {
 /** Explicit searches only. Shares SIMKL auth/quota/lock; no second client or background worker. */
 internal class MatrixSearchRepository(private val prefs: SharedPreferences, private val simkl: SimklClient? = null,
     private val simklGate: Mutex = Mutex(), private val context: android.content.Context? = null,
-    private val suggestionsSource: DynamicSuggestionsSource = LiveDynamicSuggestionsSource) {
+    private val suggestionsSource: DynamicSuggestionsSource = LiveDynamicSuggestionsSource,
+    private val catalogSearch: (String, String) -> Result<List<MediaCard>> = CinemetaClient::searchCatalog) {
     val ai = MatrixAiClient(prefs, context).apply {
         onConfigurationChanged = { clearCache() }
     }
@@ -225,7 +242,9 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
         val now = System.currentTimeMillis()
         val saved = cachedSearchCards(key, forceRefresh)
         saved ?: when (provider) {
-            MatrixSearchProvider.CATALOG -> cinemetaSearch(query, onProgress)
+            MatrixSearchProvider.CATALOG -> cinemetaSearch(query, onProgress).getOrElse {
+                throw CatalogUnavailableException(it)
+            }
             MatrixSearchProvider.SIMKL -> simklGate.withLock { simkl?.search(query)?.items?.map { item ->
                 MediaCard(item.intent, item.title.orEmpty(), item.poster.orEmpty(), item.intent,
                     MediaLinks.SOURCE, true, 0, 0, item.metadata.orEmpty(), item.mediaType.orEmpty(), item.summary.orEmpty(), item.simklReference.orEmpty())
@@ -244,13 +263,11 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
      * Searches both movie and TV series catalogs on Cinemeta in parallel,
      * merging and ranking results based on query relevance and media popularity.
      */
-    private suspend fun cinemetaSearch(query: String, onProgress: ((String) -> Unit)? = null): List<MediaCard> = coroutineScope {
+    private suspend fun cinemetaSearch(query: String, onProgress: ((String) -> Unit)? = null): Result<List<MediaCard>> = coroutineScope {
         onProgress?.invoke("Searching Cinemeta catalog…")
-        val movieDeferred = async(Dispatchers.IO) { CinemetaClient.searchCatalog("movie", query) }
-        val seriesDeferred = async(Dispatchers.IO) { CinemetaClient.searchCatalog("series", query) }
-        val movies = movieDeferred.await()
-        val series = seriesDeferred.await()
-        CinemetaClient.rankResults(movies, series, query)
+        val movieDeferred = async(Dispatchers.IO) { catalogSearch("movie", query) }
+        val seriesDeferred = async(Dispatchers.IO) { catalogSearch("series", query) }
+        combineCatalogResults(movieDeferred.await(), seriesDeferred.await(), query)
     }
 
     /**
@@ -459,7 +476,9 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
 
         // 2. If no valid ID (or mismatched), search Cinemeta catalog with tiered matching
         if (poster.isBlank() || validId.isBlank()) {
-            val cards = memoLookup(catalogMemo, type to rec.title) { CinemetaClient.searchCatalog(type, rec.title) }
+            val cards = memoLookup(catalogMemo, type to rec.title) {
+                CinemetaClient.searchCatalog(type, rec.title).getOrDefault(emptyList())
+            }
             val tier1 = cards.firstOrNull {
                 cleanTitle(it.title) == targetClean && matchesYear(rec.year, it.metadata, tolerance = 0)
             }

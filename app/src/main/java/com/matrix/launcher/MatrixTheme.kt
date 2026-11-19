@@ -151,6 +151,14 @@ internal object MatrixTheme {
         MatrixLayout.theme = state
     }
 
+    /**
+     * Other tokens flow through observable [MatrixLayout.theme] in composition via [MatrixTvTheme]
+     * and the layout getters. Only tileSize maps to the grid's LIST_COLUMNS preference, so only
+     * a tileSize change needs refresh(false). All theme changes can apply without recreation.
+     */
+    fun needsDataRefresh(previous: ThemeState, next: ThemeState): Boolean =
+        previous.tileSize != next.tileSize
+
     /** "#AARRGGBB" rendering of a colour, for the Theme page status rows. */
     fun formatColor(color: Int): String = "#%08X".format(color)
 

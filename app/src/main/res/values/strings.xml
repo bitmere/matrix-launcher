@@ -6,6 +6,10 @@
     <string name="input_key_service_description">Opens the input switcher when the remote\'s Input button is pressed.</string>
     <string name="matrix_wallpaper_import">Matrix wallpaper</string>
     <string name="search_refresh_results">Refresh results</string>
+    <string name="search_progress_ai_discovery">AI discovery</string>
+    <string name="search_progress_searching">Searching</string>
+    <string name="search_ai_summary_title">AI discovery summary</string>
+    <string name="search_catalog_unavailable">Catalog unavailable — check connection</string>
 
     <!-- P1: home settings strings (English only) -->
     <string name="settings_home_title">Home settings</string>

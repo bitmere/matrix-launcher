@@ -17,7 +17,7 @@ These are **code-based mockups, not device screenshots or Compose runtime render
 - `MatrixCards.kt`: fallback app tiles, portrait/landscape cards, type pill, rating background `#EE111524`, gold border `#F59E0B`, score text `#FFD166`, and progress track. Example numbers illustrate the renderer, not verified ratings.
 - `res/drawable/matrix_banner.xml`: unchanged original green mark/background paths, reused directly. `res/mipmap-anydpi/matrix_launcher.xml` references the related `matrix_mark.xml` adaptive foreground; no replacement logo is invented.
 - Existing `ic_search`, `ic_input`, `ic_wifi`, `ic_home_refresh`, `ic_apps` and `ic_settings` Android vector paths are reused for actual toolbar/fallback icon shapes. No third-party app logo is fabricated.
-- `MatrixSearchScreen.kt`, `MatrixSearchOrb.kt`, `MatrixMediaRouter.kt`, `HomeSections.java` and `MatrixSearchRepository.kt`: verify the search, media handoff and optional SIMKL/AI copy. No generated search-results screen or fake AI answer is presented.
+- `MatrixSearchScreen.kt`, `MatrixMediaRouter.kt`, `HomeSections.java` and `MatrixSearchRepository.kt`: verify the search, media handoff and optional SIMKL/AI copy. No generated search-results screen or fake AI answer is presented.
 
 ## Reproduce
 
