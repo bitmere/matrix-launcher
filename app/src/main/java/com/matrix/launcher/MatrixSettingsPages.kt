@@ -329,7 +329,7 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
             MatrixTheme.apply(state)
             // The tileSize token is the LIST_COLUMNS value; Apply makes it live.
             scope.repository.prefs.edit { putInt(MatrixPrefs.LIST_COLUMNS, state.tileSize) }
-            scope.recreate()
+            if (MatrixTheme.needsDataRefresh(theme, state)) scope.refresh(false)
         }
         fun reloadAndApply() {
             ioScope.launch(Dispatchers.IO) {
@@ -337,16 +337,17 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
                 withContext(Dispatchers.Main) { applyLoaded(loaded) }
             }
         }
-        /** Tap a token row: advance its value, save theme.json, apply, restart Home. */
+        /** Advance a token, save theme.json, and apply it live. */
         fun applyEdited(newState: ThemeState) {
             ioScope.launch(Dispatchers.IO) {
                 val saved = runCatching { MatrixTheme.save(scope.context.filesDir, newState) }.isSuccess
                 withContext(Dispatchers.Main) {
                     if (!saved) { themeError = scope.context.getString(R.string.settings_theme_import_failed); return@withContext }
+                    themeError = ""
                     MatrixTheme.apply(newState)
                     // The tileSize token is the LIST_COLUMNS value; Apply makes it live.
                     scope.repository.prefs.edit { putInt(MatrixPrefs.LIST_COLUMNS, newState.tileSize) }
-                    scope.recreate()
+                    if (MatrixTheme.needsDataRefresh(theme, newState)) scope.refresh(false)
                 }
             }
         }
@@ -398,8 +399,12 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
                 ioScope.launch(Dispatchers.IO) {
                     java.io.File(scope.context.filesDir, THEME_FILE_NAME).delete()
                     withContext(Dispatchers.Main) {
-                        MatrixTheme.apply(ThemeState.defaults())
-                        scope.recreate()
+                        val defaults = ThemeState.defaults()
+                        themeError = ""
+                        MatrixTheme.apply(defaults)
+                        // Reset the persisted grid columns along with the theme token.
+                        scope.repository.prefs.edit { putInt(MatrixPrefs.LIST_COLUMNS, ThemeState.DEFAULT_TILE_SIZE) }
+                        if (MatrixTheme.needsDataRefresh(theme, defaults)) scope.refresh(false)
                     }
                 }
             })
