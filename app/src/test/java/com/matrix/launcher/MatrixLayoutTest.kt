@@ -36,14 +36,52 @@ class MatrixLayoutTest {
         val viewport = 900.dp
         for (columns in 3..6) {
             val landscape = MatrixLayout.cardWidth(viewport, columns, 10.dp)
-            val poster = MatrixLayout.mediaWidth(landscape, true)
+            val poster = MatrixLayout.preferredPortraitWidth(viewport, columns)
             val count = MatrixLayout.fittingColumns(viewport, poster, 10.dp)
             val used = poster * count + MatrixLayout.gap * (count - 1) + 20.dp
             assertTrue("Posters must fit without truncating the last column", used <= viewport)
             assertTrue("Portraits should not consume landscape widths", poster < landscape)
-            assertTrue(poster <= 144.dp)
-            assertEquals(landscape, MatrixLayout.mediaWidth(landscape, false))
+            assertTrue(poster <= MatrixLayout.portraitCeiling(columns, viewport))
+            assertEquals(landscape, MatrixLayout.mediaWidth(landscape, false, viewport, columns))
         }
+    }
+    @Test fun portraitWidthsFollowEachSizeAtStandardWideAndNarrowWindows() {
+        val cases = listOf(
+            960 to listOf(168f, 126.25f, 99f, 80.833336f),
+            1920 to listOf(210f, 180f, 150f, 120f),
+            640 to listOf(105f, 76.25f, 59f, 47.5f)
+        )
+        for ((window, expected) in cases) for (columns in 3..6) {
+            assertEquals("window=$window columns=$columns", expected[columns - 3],
+                MatrixLayout.preferredPortraitWidth(window.dp, columns).value, .001f)
+        }
+    }
+    @Test fun homeAndSearchFitTheSamePreferredPortraitDespiteDifferentInsets() {
+        for (window in listOf(640, 960, 1920)) for (columns in 3..6) {
+            val preferred = MatrixLayout.preferredPortraitWidth(window.dp, columns)
+            val homeSlot = MatrixLayout.cardWidth(window.dp, columns, MatrixLayout.channelInset)
+            val home = MatrixLayout.mediaWidth(homeSlot, true, window.dp, columns)
+            val panel = window.dp - MatrixLayout.panelInset * 2
+            val count = MatrixLayout.fittingColumns(panel, preferred, 10.dp)
+            val searchSlot = MatrixLayout.cardWidth(panel, count, 10.dp)
+            assertEquals(home, preferred.coerceAtMost(searchSlot))
+            // Mixed rows retain landscape slots but share the same portrait artwork policy.
+            val mixedSlot = MatrixLayout.cardWidth(panel, columns, 10.dp)
+            assertEquals(home, MatrixLayout.mediaWidth(mixedSlot, true, window.dp, columns))
+            assertEquals(mixedSlot, MatrixLayout.mediaWidth(mixedSlot, false, window.dp, columns))
+        }
+    }
+    @Test fun portraitCeilingScaleClampsAtBothBounds() {
+        for ((index, base) in listOf(168f, 144f, 120f, 96f).withIndex()) {
+            for (window in listOf(320, 640, 720))
+                assertEquals(base * .75f, MatrixLayout.portraitCeiling(index + 3, window.dp).value, .001f)
+            assertEquals(base, MatrixLayout.portraitCeiling(index + 3, 960.dp).value, .001f)
+            for (window in listOf(1200, 1920, 2560))
+                assertEquals(base * 1.25f, MatrixLayout.portraitCeiling(index + 3, window.dp).value, .001f)
+        }
+    }
+    @Test fun portraitArtworkCannotExceedItsContainerSlot() {
+        assertEquals(40.dp, MatrixLayout.mediaWidth(40.dp, true, 1920.dp, 3))
     }
     @Test fun dpadRevealCannotEatTheFixedRowMargin() {
         for (inset in listOf(MatrixLayout.channelInset, MatrixLayout.dockInset)) {

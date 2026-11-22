@@ -57,11 +57,23 @@ class MatrixSafeModeTest {
         assertFalse(prefs.getBoolean(MatrixPrefs.SAFE_MODE, false))
     }
 
+    @Test fun intentOnlySafeModeUsesDefaultColumnsAndNormalModeKeepsSavedSize() {
+        val prefs = mapBackedPrefs()
+        for (columns in 3..6) {
+            prefs.edit().putInt(MatrixPrefs.LIST_COLUMNS, columns).apply()
+            assertFalse(MatrixSafeMode.isOn(prefs))
+            assertEquals(MatrixPrefs.LIST_COLUMNS_DEFAULT, MatrixSafeMode.effectiveColumns(prefs, true))
+            assertEquals(columns, MatrixSafeMode.effectiveColumns(prefs, false))
+        }
+        prefs.edit().putBoolean(MatrixPrefs.SAFE_MODE, true).apply()
+        assertEquals(6, MatrixSafeMode.effectiveColumns(prefs, false))
+    }
+
     @Test fun effectiveColumnsDefaultInSafeMode() {
         val prefs = mapBackedPrefs()
         prefs.edit().putInt(MatrixPrefs.LIST_COLUMNS, 3).apply()
-        assertEquals(3, MatrixSafeMode.effectiveColumns(prefs))
+        assertEquals(3, MatrixSafeMode.effectiveColumns(prefs, MatrixSafeMode.isOn(prefs)))
         prefs.edit().putBoolean(MatrixPrefs.SAFE_MODE, true).apply()
-        assertEquals(MatrixPrefs.LIST_COLUMNS_DEFAULT, MatrixSafeMode.effectiveColumns(prefs))
+        assertEquals(MatrixPrefs.LIST_COLUMNS_DEFAULT, MatrixSafeMode.effectiveColumns(prefs, MatrixSafeMode.isOn(prefs)))
     }
 }

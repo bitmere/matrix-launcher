@@ -204,7 +204,7 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
             stringResource(R.string.settings_size_small) to stringResource(R.string.settings_size_small_detail)
         )
         // In safe mode the default column count is in effect, not the saved one.
-        val effective = if (scope.repository.safeMode) MatrixPrefs.LIST_COLUMNS_DEFAULT else MatrixSafeMode.effectiveColumns(scope.repository.prefs)
+        val effective = MatrixSafeMode.effectiveColumns(scope.repository.prefs, scope.repository.safeMode)
         val entries = sizes.menuItems().mapIndexed { index, item ->
             item.copy(selected = effective == index + 3)
         }

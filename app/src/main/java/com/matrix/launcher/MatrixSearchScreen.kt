@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
 /** Query, provider controls and results stay on one screen; only explicit submission fetches. */
 
 @Composable
-internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> Unit,
+internal fun MatrixSearchScreen(repository: ComposeHomeRepository, windowWidth: androidx.compose.ui.unit.Dp, back: () -> Unit,
     integrations: () -> Unit, open: (MediaCard) -> Unit) {
     val providers = repository.search.providers()
     val savedProvider = repository.prefs.getString(MatrixPrefs.LAST_SEARCH_PROVIDER, null)
@@ -594,7 +594,7 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, back: () -> U
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             enter = fadeIn(tween(350)) + slideInVertically(initialOffsetY = { 30 }, animationSpec = tween(350))
                         ) {
-                            MatrixMediaGrid(results, MatrixSafeMode.effectiveColumns(repository.prefs), grid, repository,
+                            MatrixMediaGrid(results, windowWidth, MatrixSafeMode.effectiveColumns(repository.prefs, repository.safeMode), grid, repository,
                                 results.first().id, firstResult, { _, _ -> }, open,
                                 Modifier.fillMaxSize())
                         }

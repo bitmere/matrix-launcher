@@ -5,7 +5,7 @@ import androidx.core.content.edit
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun MatrixWallpaperScreen(page: String, repository: ComposeHomeRepository, push: (String) -> Unit,
+internal fun MatrixWallpaperScreen(page: String, repository: ComposeHomeRepository, windowWidth: androidx.compose.ui.unit.Dp, push: (String) -> Unit,
     back: () -> Unit, changed: () -> Unit, notice: (String) -> Unit) {
     val prefs = repository.prefs
     val scope = rememberCoroutineScope()
@@ -26,8 +26,8 @@ internal fun MatrixWallpaperScreen(page: String, repository: ComposeHomeReposito
             },
             SettingAction("Wallpaper credits", "Creators, licenses and original Commons file pages") { push("wallpaper-credits") }
         ), back)
-        "wallpaper-device" -> MatrixDevicePictures(page, repository, push, back, changed, notice)
-        "wallpaper-gallery" -> MatrixSavedWallpapers(repository, back, changed, notice)
+        "wallpaper-device" -> MatrixDevicePictures(page, repository, windowWidth, push, back, changed, notice)
+        "wallpaper-gallery" -> MatrixSavedWallpapers(repository, windowWidth, back, changed, notice)
         "wallpaper-source" -> SettingsPage("Wallpaper source", "With no pictures, Home uses the focused app or poster color.",
             listOf("both" to "All saved pictures", "local" to "Imported and earlier saved pictures", "downloaded" to "Commons downloads only", "off" to "Focused artwork color").map { (id, name) ->
                 SettingAction(name, selected = prefs.getString("wallpaper_mode", "both") == id, id = id) { save { putString("wallpaper_mode", id); putLong("wallpaper_changed", 0) }; back() }
@@ -50,14 +50,14 @@ internal fun MatrixWallpaperScreen(page: String, repository: ComposeHomeReposito
             if (credit != null) MatrixQrPage("Wallpaper credit", credit!!.page,
                 "${credit!!.title}\n${credit!!.artist} · ${credit!!.license}\nResized and JPEG-encoded. Scan for original file, full attribution and license.", back)
             else SettingsPage("Wallpaper credit", "Loading credit, or this picture is no longer in the cache.", emptyList(), back)
-        } else if (page.startsWith("wallpaper-device:")) MatrixDevicePictures(page, repository, push, back, changed, notice)
+        } else if (page.startsWith("wallpaper-device:")) MatrixDevicePictures(page, repository, windowWidth, push, back, changed, notice)
         else SettingsPage("Wallpapers", "Reddit integration has been removed. Saved pictures are kept offline.",
                 listOf(SettingAction("Wallpaper settings", role = MatrixControlRole.Action) { back() }), back)
     }
 }
 
 @Composable
-private fun MatrixSavedWallpapers(repository: ComposeHomeRepository, back: () -> Unit, changed: () -> Unit, notice: (String) -> Unit) {
+private fun MatrixSavedWallpapers(repository: ComposeHomeRepository, windowWidth: androidx.compose.ui.unit.Dp, back: () -> Unit, changed: () -> Unit, notice: (String) -> Unit) {
     val files by produceState<List<java.io.File>?>(null, repository) { value = repository.wallpapers.collection() }
     val scope = rememberCoroutineScope()
     val initial = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -70,7 +70,7 @@ private fun MatrixSavedWallpapers(repository: ComposeHomeRepository, back: () ->
         when {
             files == null -> MatrixLoadState("Loading saved pictures…", true)
             cards.isEmpty() -> MatrixLoadState("No saved pictures. Import an image or download Commons landscapes first.")
-            else -> MatrixMediaGrid(cards, 3, grid, repository,
+            else -> MatrixMediaGrid(cards, windowWidth, 3, grid, repository,
                 cards.firstOrNull { it.id == repository.prefs.getString("wallpaper_current", "") }?.id ?: cards.first().id,
                 initial, { _, _ -> }, { card -> scope.launch {
                     if (repository.wallpapers.select(card.link)) { changed(); back() }

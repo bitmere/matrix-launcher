@@ -151,7 +151,7 @@ internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: Loca
         val wide = page in listOf("apps", "favorites", "sources", "list", "search", "wallpaper-gallery") || page.startsWith("wallpaper-device:")
         Dialog(onDismissRequest = { if (page != "order") back() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = page != "order")) {
             var sawFreshDown by remember(page) { mutableStateOf(false) }
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .42f)).onPreviewKeyEvent { event ->
+            BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .42f)).onPreviewKeyEvent { event ->
                 val native = event.nativeKeyEvent
                 val isSelect = native.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
                     native.keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
@@ -176,14 +176,15 @@ internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: Loca
                     }
                 } else false
             }, contentAlignment = Alignment.CenterEnd) {
+                val windowWidth = maxWidth
                 MatrixPanel(wide) {
                     CompositionLocalProvider(LocalMatrixPagePath provides matrixPagePath(history.dropLast(1))) {
                     pageState.SaveableStateProvider(page) {
                     key(page) { when {
                         page.startsWith("simkl") -> MatrixAccountScreen(page, repository, ::push, ::back, refresh, ::accountConnected) { destination = it; listPage = 1; listAtFirst = true; listReset++; push("list") }
-                        page == "wallpapers" || page.startsWith("wallpaper-") -> MatrixWallpaperScreen(page, repository, ::push, ::back, wallpaperChanged, notice)
+                        page == "wallpapers" || page.startsWith("wallpaper-") -> MatrixWallpaperScreen(page, repository, windowWidth, ::push, ::back, wallpaperChanged, notice)
                         page.startsWith("home-") -> MatrixHomeControlScreen(page, repository, ::push, ::back, open, notice)
-                        page == "search" -> MatrixSearchScreen(repository, ::back, { push("integrations") }, ::activate)
+                        page == "search" -> MatrixSearchScreen(repository, windowWidth, ::back, { push("integrations") }, ::activate)
                         page == "integrations" || page == "media-app" || page == "catalog" || page.startsWith("tmdb") || page.startsWith("ai") -> MatrixIntegrationsScreen(page, repository, ::push, ::back)
                         else -> when (page) {
                         // Home settings pages are data-driven: see matrixHomeSettingsPages
@@ -238,7 +239,7 @@ internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: Loca
                         "licenses" -> MatrixLicenseScreen(::back)
                         "inputs" -> MatrixMenu("Inputs", inputs.map { MatrixMenuItem(it.title, id = it.id) }, ::back, inputError) { open(inputs[it].intent) }
                         "order" -> orderPage?.let { MatrixOrder(it, repository, refresh, ::back) }
-                        "list" -> MatrixList(listData, listError, listPage, MatrixSafeMode.effectiveColumns(repository.prefs), repository,
+                        "list" -> MatrixList(listData, listError, listPage, windowWidth, MatrixSafeMode.effectiveColumns(repository.prefs, repository.safeMode), repository,
                             ::back, ::goHome, { listPage++; listAtFirst = true }, listReset, { listAtFirst = it }, destination, ::toggleListPin, ::activate)
                     }
                     } }

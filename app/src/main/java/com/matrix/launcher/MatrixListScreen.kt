@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 
 @Composable
-internal fun MatrixList(data: Pair<MediaRow, Boolean>?, error: String, page: Int, columns: Int, repository: ComposeHomeRepository, back: () -> Unit,
+internal fun MatrixList(data: Pair<MediaRow, Boolean>?, error: String, page: Int, windowWidth: androidx.compose.ui.unit.Dp, columns: Int, repository: ComposeHomeRepository, back: () -> Unit,
     home: () -> Unit, next: () -> Unit, resetToken: Int, atFirst: (Boolean) -> Unit, destination: String = "",
     togglePin: ((String) -> Unit)? = null, open: (MediaCard) -> Unit) {
     val initial = remember { FocusRequester() }
@@ -39,7 +39,7 @@ internal fun MatrixList(data: Pair<MediaRow, Boolean>?, error: String, page: Int
             error.isNotBlank() -> MatrixLoadState(error)
             data == null -> MatrixLoadState("Loading your list…", true)
             data.first.cards.isEmpty() -> MatrixLoadState("No titles in this list yet. Use Back to choose another list.")
-            else -> MatrixMediaGrid(data.first.cards, columns, grid, repository, restoreId, initial,
+            else -> MatrixMediaGrid(data.first.cards, windowWidth, columns, grid, repository, restoreId, initial,
                 { index, card -> focusedCard = card.id; atFirst(index == 0) }, open, Modifier.weight(1f)) {
                 if (data.second) item(key = "next-page", contentType = "action", span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
