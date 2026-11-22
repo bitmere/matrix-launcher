@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.10 — stable
+
+- Order-screen fixes (PR #8): pressing OK on a channel row acts at once (the 400 ms first-press ignore is gone); hold-OK to show or hide a channel now uses a timed hold instead of depending on the remote sending key repeats; rows show ✓ shown / ○ hidden; gamepad A saves a move like OK.
+- Settings rows no longer show a pale unfocused border (PR #8); the focused border is unchanged.
+- Temporary diagnostic for the size-checkmark delay (PR #8): logging only, off by default.
+- Tests: 291 JVM tests, all passing; lint 0 errors, 4 warnings.
+
 ## 2.7.9 — stable
 
 - Impeccable design setup (PR #6): vendored skill (v4.10.0), Codex design hooks with a `.kt` detector, product context and design tokens in PRODUCT.md / DESIGN.md. Config/setup only; no app code changed.
