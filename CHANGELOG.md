@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.11 — stable
+
+- Card-size policy (PR #11): one shared portrait-width calculation for Home, Search and the list page, so both screens now size posters the same way; four distinct poster sizes replace the single 144 dp ceiling (Large 168, Medium 126, Compact 99, Small 81 dp at the 960 dp reference window, scaling with the viewport); the grid uses the theme gap consistently; effective columns now resolve from one runtime-aware safe-mode source.
+- Tests: 296 JVM tests, all passing; lint 0 errors, 4 warnings.
+
 ## 2.7.10 — stable
 
 - Order-screen fixes (PR #8): pressing OK on a channel row acts at once (the 400 ms first-press ignore is gone); hold-OK to show or hide a channel now uses a timed hold instead of depending on the remote sending key repeats; rows show ✓ shown / ○ hidden; gamepad A saves a move like OK.
