@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 /** Uses the same TV controls/cards as saved wallpapers, including remote focus and scrolling. */
 @Composable
-internal fun MatrixDevicePictures(page: String, repository: ComposeHomeRepository, push: (String) -> Unit,
+internal fun MatrixDevicePictures(page: String, repository: ComposeHomeRepository, windowWidth: androidx.compose.ui.unit.Dp, push: (String) -> Unit,
     back: () -> Unit, changed: () -> Unit, notice: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -67,7 +67,7 @@ internal fun MatrixDevicePictures(page: String, repository: ComposeHomeRepositor
         when {
             pictures == null -> MatrixLoadState("Loading pictures…", true)
             cards.isEmpty() -> MatrixLoadState("No accessible pictures. Go back to allow photo access or share a downloaded image from a file manager.")
-            else -> MatrixMediaGrid(cards, 3, grid, repository, cards.first().id, initial, { _, _ -> }, { card ->
+            else -> MatrixMediaGrid(cards, windowWidth, 3, grid, repository, cards.first().id, initial, { _, _ -> }, { card ->
                 if (!busy) scope.launch {
                     busy = true
                     try {

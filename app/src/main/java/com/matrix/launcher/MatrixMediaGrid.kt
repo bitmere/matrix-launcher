@@ -13,14 +13,13 @@ import androidx.compose.ui.unit.dp
 
 /** Shared results/list geometry and focus observation; neither surface owns a duplicate grid. */
 @Composable
-internal fun MatrixMediaGrid(cards: List<MediaCard>, columns: Int, state: LazyGridState, repository: ComposeHomeRepository,
+internal fun MatrixMediaGrid(cards: List<MediaCard>, windowWidth: androidx.compose.ui.unit.Dp, columns: Int, state: LazyGridState, repository: ComposeHomeRepository,
     restoreId: String?, initial: FocusRequester, focused: (Int, MediaCard) -> Unit, open: (MediaCard) -> Unit,
     modifier: Modifier = Modifier, footer: LazyGridScope.() -> Unit = {}) {
     val inspection = LocalMatrixUiInspection.current
     BoxWithConstraints(modifier) {
-        val baseWidth = MatrixLayout.cardWidth(maxWidth, columns.coerceIn(3, 6), 10.dp)
         val portraitOnly = cards.isNotEmpty() && cards.all { it.portrait }
-        val posterWidth = MatrixLayout.mediaWidth(baseWidth, true)
+        val posterWidth = MatrixLayout.preferredPortraitWidth(windowWidth, columns)
         val count = if (portraitOnly) MatrixLayout.fittingColumns(maxWidth, posterWidth, 10.dp) else columns.coerceIn(3, 6)
         val slotWidth = MatrixLayout.cardWidth(maxWidth, count, 10.dp)
         MatrixScrollViewport {
@@ -36,12 +35,12 @@ internal fun MatrixMediaGrid(cards: List<MediaCard>, columns: Int, state: LazyGr
                             ComposeRevealPolicy.deferRepeat(event.nativeKeyEvent.repeatCount, state.isScrollInProgress)
                     },
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(MatrixLayout.gap),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 itemsIndexed(cards, key = { _, card -> card.id }, contentType = { _, _ -> "media" }) { index, card ->
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                        val width = if (portraitOnly) posterWidth.coerceAtMost(slotWidth) else MatrixLayout.mediaWidth(slotWidth, card.portrait)
+                        val width = if (portraitOnly) posterWidth.coerceAtMost(slotWidth) else MatrixLayout.mediaWidth(slotWidth, card.portrait, windowWidth, columns)
                         MatrixMediaCard(card, width, onFocus = {
                             // Grid card focus: do not mutate global Home backdrop palette during secondary grid navigation
                         },

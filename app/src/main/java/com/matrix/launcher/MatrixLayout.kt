@@ -36,9 +36,24 @@ internal object MatrixLayout {
     val playbackTrackHeight = 3.dp
     fun cardWidth(width: Dp, columns: Int, horizontalInset: Dp): Dp =
         ((width - horizontalInset * 2 - gap * (columns.coerceAtLeast(1) - 1)) / columns.coerceAtLeast(1)).coerceAtLeast(1.dp)
-    /** Portrait artwork retains 2:3 without inheriting a landscape card's oversized width. */
-    fun mediaWidth(landscapeWidth: Dp, portrait: Boolean): Dp =
-        if (portrait) (landscapeWidth * .625f).coerceAtMost(144.dp) else landscapeWidth
+    fun portraitCeiling(columns: Int, windowWidth: Dp): Dp {
+        val base = when (columns.coerceIn(3, 6)) {
+            3 -> 168.dp
+            4 -> 144.dp
+            5 -> 120.dp
+            else -> 96.dp
+        }
+        return base * (windowWidth / 960.dp).coerceIn(.75f, 1.25f)
+    }
+
+    /** Size preference uses the full window, independently of each container's insets. */
+    fun preferredPortraitWidth(windowWidth: Dp, columns: Int): Dp =
+        (cardWidth(windowWidth, columns.coerceIn(3, 6), channelInset) * .625f)
+            .coerceAtMost(portraitCeiling(columns, windowWidth))
+
+    /** Preserve landscape geometry and fit shared portrait sizing inside the container slot. */
+    fun mediaWidth(landscapeWidth: Dp, portrait: Boolean, windowWidth: Dp, columns: Int): Dp =
+        if (portrait) preferredPortraitWidth(windowWidth, columns).coerceAtMost(landscapeWidth) else landscapeWidth
 
     fun fittingColumns(width: Dp, desiredCard: Dp, horizontalInset: Dp): Int =
         ((width - horizontalInset * 2 + gap) / (desiredCard + gap)).toInt().coerceIn(1, 10)

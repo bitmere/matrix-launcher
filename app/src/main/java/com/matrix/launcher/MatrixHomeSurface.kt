@@ -105,7 +105,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
         }
     }
     val columns = HomeCardSizing.dockColumns(favorites.size)
-    val mediaColumns = HomeCardSizing.contentColumns(if (repository.safeMode) MatrixPrefs.LIST_COLUMNS_DEFAULT else repository.prefs.getInt("list_columns", 5))
+    val mediaColumns = HomeCardSizing.contentColumns(MatrixSafeMode.effectiveColumns(repository.prefs, repository.safeMode))
     MatrixBackdropSurface(artworkBackdrop = wallpaper == null) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val availableWidth = maxWidth
@@ -228,7 +228,7 @@ private fun MatrixChannelRow(row: MediaRow, width: androidx.compose.ui.unit.Dp, 
                              isLastRow: Boolean = false,
                              onFocus: (Int, MediaCard) -> Unit, click: (MediaCard) -> Unit, hold: (MediaCard) -> Unit, backHandled: () -> Unit) {
     val portraitOnly = remember(row.cards) { row.cards.isNotEmpty() && row.cards.all { it.portrait } }
-    val preferred = MatrixLayout.mediaWidth(width, portraitOnly)
+    val preferred = MatrixLayout.mediaWidth(width, portraitOnly, availableWidth, columns)
     val rowCache = remember { LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 1f) }
     val state = rememberLazyListState(cacheWindow = rowCache)
     val first = remember { FocusRequester() }
@@ -245,7 +245,7 @@ private fun MatrixChannelRow(row: MediaRow, width: androidx.compose.ui.unit.Dp, 
                 val isRetained = card.id == retainedId
                 MatrixMediaCard(card, slotWidth, { focusedId = card.id; onFocus(index, card) },
                     modifier = (if (index == 0) Modifier.focusRequester(first) else Modifier).then(if (isRetained) Modifier.focusRequester(retained) else Modifier),
-                    artworkWidth = if (portraitOnly) slotWidth else MatrixLayout.mediaWidth(slotWidth, card.portrait), onLongClick = { hold(card) }) { click(card) } }
+                    artworkWidth = if (portraitOnly) slotWidth else MatrixLayout.mediaWidth(slotWidth, card.portrait, availableWidth, columns), onLongClick = { hold(card) }) { click(card) } }
         }
     }
     LaunchedEffect(backToken) { if (backToken > 0 && backRow == row.id && row.cards.isNotEmpty()) {

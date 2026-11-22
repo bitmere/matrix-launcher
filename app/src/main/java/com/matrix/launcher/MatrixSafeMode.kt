@@ -25,8 +25,8 @@ internal object MatrixSafeMode {
         prefs.getBoolean(MatrixPrefs.SAFE_MODE, false)
 
     /** Column count in effect: the default when safe mode is on, else the saved value. */
-    fun effectiveColumns(prefs: SharedPreferences): Int =
-        if (isOn(prefs)) MatrixPrefs.LIST_COLUMNS_DEFAULT
+    fun effectiveColumns(prefs: SharedPreferences, safeMode: Boolean): Int =
+        if (safeMode) MatrixPrefs.LIST_COLUMNS_DEFAULT
         else prefs.getInt(MatrixPrefs.LIST_COLUMNS, MatrixPrefs.LIST_COLUMNS_DEFAULT)
 
     /** Pure flag/counter transition (no Android prefs): the JVM-testable seam. */
