@@ -62,6 +62,9 @@ internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: Loca
     // exposes a StateFlow snapshot, so no SharedPreferences listener is needed here.
     val settingsSnapshot by repository.settingsState.snapshot.collectAsState()
     settingsSnapshot.revision
+    LaunchedEffect(settingsSnapshot.revision) {
+        MatrixSettingsDiag.log("parent-revision") { "rev=${settingsSnapshot.revision}" } // DIAG-BUG2
+    }
     LaunchedEffect(page, orderPage, managedApp) {
         // A killed process can restore navigation, but not an in-memory movement/app context.
         // Return to its parent rather than presenting an empty panel.

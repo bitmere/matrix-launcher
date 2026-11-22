@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -243,12 +244,23 @@ private fun matrixControlColors(role: MatrixControlRole = MatrixControlRole.Acti
 @Composable
 private fun matrixControlBorder(role: MatrixControlRole = MatrixControlRole.Action): ButtonBorder {
     val colors = MaterialTheme.colorScheme
-    return ButtonDefaults.border(
-        border = Border(if (role == MatrixControlRole.Destructive)
-            BorderStroke(1.dp, colors.onErrorContainer.copy(alpha = .55f)) else MatrixControlStyle.stroke(colors)),
-        focusedBorder = Border(if (role == MatrixControlRole.Destructive)
-            BorderStroke(1.5.dp, colors.error) else BorderStroke(1.5.dp, colors.onSurface))
-    )
+    val (border, focusedBorder) = matrixControlBorders(role, colors.onSurface, colors.error, colors.onErrorContainer)
+    return ButtonDefaults.border(border = border, focusedBorder = focusedBorder)
+}
+
+/**
+ * Pure border selection for [matrixControlBorder], so the choice is JVM-testable
+ * without composition. The ordinary unfocused border is [Border.None]: rows are
+ * separated by spacing and fill, not by a pale stroke. The destructive
+ * unfocused border stays — it marks a destructive action, it is not white.
+ */
+internal fun matrixControlBorders(role: MatrixControlRole, onSurface: Color, error: Color,
+                                  errorContainer: Color): Pair<Border, Border> {
+    val border = if (role == MatrixControlRole.Destructive)
+        Border(BorderStroke(1.dp, errorContainer.copy(alpha = .55f))) else Border.None
+    val focusedBorder = Border(if (role == MatrixControlRole.Destructive)
+        BorderStroke(1.5.dp, error) else BorderStroke(1.5.dp, onSurface))
+    return border to focusedBorder
 }
 
 /** Titles and supporting text share a leading edge, rhythm and focus-aware foreground. */

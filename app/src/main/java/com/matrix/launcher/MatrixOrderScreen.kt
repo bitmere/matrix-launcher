@@ -16,11 +16,21 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.matrix.launcher.core.ReorderSession
+
+/**
+ * Pure visibility-toggle decision for an order row, so the choice is JVM-testable.
+ * Returns the new hidden set and whether the row is shown on Home afterwards.
+ */
+internal fun toggleOrderRowHidden(hidden: Set<String>, id: String): Pair<Set<String>, Boolean> {
+    val next = hidden.toMutableSet().apply { if (!add(id)) remove(id) }
+    return next to (id !in next)
+}
 
 /** Movement follows stable identities; every list mutation publishes an observable snapshot. */
 @Composable
@@ -37,7 +47,6 @@ internal fun MatrixOrder(page: OrderPage, repository: ComposeHomeRepository, ref
     val reveals = remember(page) { page.entries.associate { it.id to BringIntoViewRequester() } }
     val saveFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
-    val openedAt = remember(page) { android.os.SystemClock.uptimeMillis() }
     fun publish(id: String) {
         // Reordering must not anchor the viewport to the old first visible item's key.
         if (draft.items != entries) list.requestScrollToItem(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset)
@@ -65,7 +74,7 @@ internal fun MatrixOrder(page: OrderPage, repository: ComposeHomeRepository, ref
                 if (event.type == KeyEventType.KeyDown && draft.move(if (event.key == Key.DirectionDown) 1 else -1)) publish(movingId!!)
                 true
             }
-            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { if (event.type == KeyEventType.KeyUp) save(); true }
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.ButtonA -> { if (event.type == KeyEventType.KeyUp) save(); true }
             Key.DirectionRight -> { if (event.type == KeyEventType.KeyDown) saveFocus.requestFocus(); true }
             Key.DirectionLeft -> { if (event.type == KeyEventType.KeyDown) focusRequest++; true }
             else -> false
@@ -85,15 +94,23 @@ internal fun MatrixOrder(page: OrderPage, repository: ComposeHomeRepository, ref
             LazyColumn(state = list, modifier = Modifier.fillMaxSize().matrixScrollEdges({ list.canScrollBackward }, { list.canScrollForward }),
                 contentPadding = PaddingValues(MatrixLayout.focusInset), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
-                    MatrixButton(onClick = {
-                        if (android.os.SystemClock.uptimeMillis() - openedAt >= 400L) begin(entry.id)
-                    }, role = MatrixControlRole.Option,
-                        onLongClick = if (!page.visibility || movingId != null) null else { {
-                            hidden = hidden.toMutableSet().apply { if (!add(entry.id)) remove(entry.id) }
-                            repository.rowShown(entry.id, entry.id !in hidden); refresh(false)
-                        } },
+                    // One explicit press lifecycle, shared with the home cards: the
+                    // modifier times holds with a 380 ms timer on the initial DOWN
+                    // instead of depending on key repeats (many remotes send none),
+                    // fires a short press at once, and suppresses it after a hold.
+                    // The Button's own onLongClick stays null so the built-in
+                    // repeat-dependent long-press cannot double-fire.
+                    MatrixButton(onClick = { begin(entry.id) }, role = MatrixControlRole.Option,
                         modifier = Modifier.fillMaxWidth().bringIntoViewRequester(reveals.getValue(entry.id)).focusRequester(targets.getValue(entry.id))
-                            .onFocusChanged { if (it.isFocused && movingId == null) focusId = entry.id }) {
+                            .onFocusChanged { if (it.isFocused && movingId == null) focusId = entry.id }
+                            .tvCardClickable(
+                                onClick = { begin(entry.id) },
+                                onLongClick = if (!page.visibility || movingId != null) null else { {
+                                    val (nextHidden, shown) = toggleOrderRowHidden(hidden, entry.id)
+                                    hidden = nextHidden
+                                    repository.rowShown(entry.id, shown); refresh(false)
+                                } }
+                            )) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
                                 if (movingId == entry.id) Icon(painterResource(R.drawable.ic_matrix_move), "Moving item", Modifier.size(22.dp))
@@ -105,6 +122,10 @@ internal fun MatrixOrder(page: OrderPage, repository: ComposeHomeRepository, ref
                                 page.visibility -> if (entry.id in hidden) "Hidden on Home" else "Shown on Home"
                                 else -> ""
                             }, Modifier.weight(1f))
+                            if (page.visibility) {
+                                Text(if (entry.id in hidden) "○" else "✓", style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.clearAndSetSemantics { })
+                            }
                         }
                     }
                 }

@@ -54,6 +54,7 @@ internal fun MatrixMenu(title: String, entries: List<MatrixMenuItem>, back: () -
     val openedAt = remember(title) { android.os.SystemClock.uptimeMillis() }
     var sawMenuDown by remember(title) { mutableStateOf(false) }
     SideEffect {
+        MatrixSettingsDiag.log("menu-render") { "title=$title selected=${entries.mapIndexedNotNull { i, e -> i.takeIf { e.selected == true } }} checked=${entries.mapIndexedNotNull { i, e -> i.takeIf { e.checked == true } }}" } // DIAG-BUG2
         val index = entries.indexOfFirst { it.id == focusedId }
         if (index >= 0 && inspection?.focusedOption == index) {
             val entry = entries[index]
