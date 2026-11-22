@@ -69,7 +69,7 @@ private fun rememberMatrixBanner(pkg: String?, repository: ComposeHomeRepository
 }
 
 @Composable
-private fun Modifier.tvCardClickable(
+internal fun Modifier.tvCardClickable(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?
 ): Modifier {
@@ -77,11 +77,17 @@ private fun Modifier.tvCardClickable(
     val scope = rememberCoroutineScope()
     var pressJob by remember { mutableStateOf<Job?>(null) }
     var isLongPressTriggered by remember { mutableStateOf(false) }
+    // An UP only counts if this row saw its DOWN: a press that started on
+    // another row (focus moved mid-hold) must never act on this row.
+    var sawDown by remember { mutableStateOf(false) }
     return this
         .onFocusChanged {
-            if (!it.isFocused && !isLongPressTriggered) {
-                pressJob?.cancel()
-                pressJob = null
+            if (!it.isFocused) {
+                if (!isLongPressTriggered) {
+                    pressJob?.cancel()
+                    pressJob = null
+                }
+                sawDown = false
             }
         }
         .onPreviewKeyEvent { event ->
@@ -95,6 +101,7 @@ private fun Modifier.tvCardClickable(
                     android.view.KeyEvent.ACTION_DOWN -> {
                         if (native.repeatCount == 0 && pressJob == null) {
                             isLongPressTriggered = false
+                            sawDown = true
                             pressJob = scope.launch {
                                 delay(380L)
                                 isLongPressTriggered = true
@@ -104,14 +111,21 @@ private fun Modifier.tvCardClickable(
                         true
                     }
                     android.view.KeyEvent.ACTION_UP -> {
-                        pressJob?.cancel()
-                        pressJob = null
-                        if (isLongPressTriggered) {
-                            isLongPressTriggered = false
+                        if (!sawDown) {
+                            // Orphan UP: its DOWN went to another row. Swallow it
+                            // so the Button's own handling cannot act on it either.
+                            true
                         } else {
-                            onClick()
+                            sawDown = false
+                            pressJob?.cancel()
+                            pressJob = null
+                            if (isLongPressTriggered) {
+                                isLongPressTriggered = false
+                            } else {
+                                onClick()
+                            }
+                            true
                         }
-                        true
                     }
                     else -> false
                 }

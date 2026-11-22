@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -202,13 +203,21 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
             stringResource(R.string.settings_size_compact) to stringResource(R.string.settings_size_compact_detail),
             stringResource(R.string.settings_size_small) to stringResource(R.string.settings_size_small_detail)
         )
+        // In safe mode the default column count is in effect, not the saved one.
+        val effective = if (scope.repository.safeMode) MatrixPrefs.LIST_COLUMNS_DEFAULT else MatrixSafeMode.effectiveColumns(scope.repository.prefs)
+        val entries = sizes.menuItems().mapIndexed { index, item ->
+            item.copy(selected = effective == index + 3)
+        }
+        // SideEffect, not a direct read: StateFlow.value must not be read in composition.
+        SideEffect {
+            MatrixSettingsDiag.log("size-build") { "effective=$effective selected=${entries.mapIndexedNotNull { i, e -> i.takeIf { e.selected == true } }} rev=${scope.repository.settingsState.snapshot.value.revision}" } // DIAG-BUG2
+        }
         SettingsPageContent.Menu(
-            entries = sizes.menuItems().mapIndexed { index, item ->
-                // In safe mode the default column count is in effect, not the saved one.
-                item.copy(selected = (if (scope.repository.safeMode) MatrixPrefs.LIST_COLUMNS_DEFAULT else MatrixSafeMode.effectiveColumns(scope.repository.prefs)) == index + 3)
-            },
+            entries = entries,
             onSelect = {
+                val before = scope.repository.settingsState.snapshot.value.revision // DIAG-BUG2
                 scope.repository.prefs.edit { putInt(MatrixPrefs.LIST_COLUMNS, it + 3) }
+                MatrixSettingsDiag.log("size-select") { "index=$it columns=${it + 3} rev=$before -> ${scope.repository.settingsState.snapshot.value.revision}" } // DIAG-BUG2
                 scope.refresh(false)
             }
         )
@@ -480,6 +489,7 @@ internal fun MatrixSettingsPage(def: SettingsPageDef, scope: MatrixSettingsPageS
         onDispose { cancelPending?.invoke() }
     }
     val content = def.build(scope)
+    MatrixSettingsDiag.logMenuBuilt(def.id, content) // DIAG-BUG2
     val title = stringResource(def.titleRes)
     val description = content.description
         ?: if (def.descriptionRes != 0) stringResource(def.descriptionRes) else ""

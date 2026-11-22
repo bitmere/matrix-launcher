@@ -20,8 +20,9 @@ internal class MatrixSettingsState(private val prefs: SharedPreferences) {
     private val _snapshot = MutableStateFlow(MatrixSettingsSnapshot(0))
     val snapshot: StateFlow<MatrixSettingsSnapshot> = _snapshot.asStateFlow()
 
-    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         _snapshot.value = MatrixSettingsSnapshot(_snapshot.value.revision + 1)
+        MatrixSettingsDiag.log("revision") { "key=$key rev=${_snapshot.value.revision}" } // DIAG-BUG2
     }
 
     init {
