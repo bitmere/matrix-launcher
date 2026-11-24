@@ -47,7 +47,10 @@ internal object ApkInstaller {
         if (!runCatching { matchesRelease(context, apkFile, release) }.getOrDefault(false)) {
             return InstallOutcome.Error("The APK identity, version or signing certificate is invalid. Install the approved release from GitHub.")
         }
-        try { PendingUpdateSession.abandon(context) } catch (_: Exception) {
+        val savedSessionId = PendingUpdateSession.savedId(context)
+        try { PendingUpdateSession.abandon(context) } catch (failure: Exception) {
+            android.util.Log.w("MatrixUpdate",
+                "Couldn’t settle saved session $savedSessionId: ${failure.javaClass.name}: ${failure.message}", failure)
             return InstallOutcome.Error("Couldn’t settle the previous install. Try again.")
         }
         return try {
