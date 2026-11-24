@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.12 — stable
+
+- Updater settle fix (PR #14): after a 2.7.11 install attempt, the updater no longer fails every retry — it now checks whether the saved install session still exists before clearing it, treats a missing or not-owned session as already settled, and logs the error and session id instead of hiding it.
+- Tests: 306 JVM tests, all passing; lint 0 errors, 4 warnings.
+
 ## 2.7.11 — stable
 
 - Card-size policy (PR #11): one shared portrait-width calculation for Home, Search and the list page, so both screens now size posters the same way; four distinct poster sizes replace the single 144 dp ceiling (Large 168, Medium 126, Compact 99, Small 81 dp at the 960 dp reference window, scaling with the viewport); the grid uses the theme gap consistently; effective columns now resolve from one runtime-aware safe-mode source.
