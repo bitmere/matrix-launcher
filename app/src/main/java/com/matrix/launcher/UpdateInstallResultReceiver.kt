@@ -99,11 +99,15 @@ class UpdateInstallResultReceiver : BroadcastReceiver() {
                         context.startActivity(confirm)
                         publish(UpdateInstallEvents.InstallResult.WaitingForConfirmation)
                     } catch (_: Exception) {
-                        val settled = runCatching { context.packageManager.packageInstaller.abandonSession(id) }.isSuccess
+                        val settled = runCatching {
+                            PendingUpdateSession.settle(PackageInstallerSessionStore(context.packageManager.packageInstaller), id)
+                        }.getOrDefault(false)
                         publish(UpdateInstallEvents.InstallResult.Failed("Couldn’t open install confirmation. Try Install again."), settled)
                     }
                 } else {
-                    val settled = runCatching { context.packageManager.packageInstaller.abandonSession(id) }.isSuccess
+                    val settled = runCatching {
+                        PendingUpdateSession.settle(PackageInstallerSessionStore(context.packageManager.packageInstaller), id)
+                    }.getOrDefault(false)
                     publish(UpdateInstallEvents.InstallResult.Failed("The installer asked for confirmation but gave no screen to show."), settled)
                 }
             }
