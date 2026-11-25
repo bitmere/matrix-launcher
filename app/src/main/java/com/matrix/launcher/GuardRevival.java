@@ -12,10 +12,11 @@ import android.service.notification.NotificationListenerService;
  *
  * A notification listener keeps its approval across a force stop, and the system binds it again
  * once the process is gone. That rebind is what brings Home back on TCL and Xiaomi. No notification
- * is read. Enable with {@code cmd notification allow_listener com.matrix.launcher/com.gathin.tvhome.GuardRevival}.
+ * content is parsed. Media sessions are observed while connected. Enable with {@code cmd notification allow_listener com.matrix.launcher/com.gathin.tvhome.GuardRevival}.
  */
 public class GuardRevival extends NotificationListenerService {
     private BroadcastReceiver unlocked;
+    private AndroidNowPlaying nowPlaying;
 
     @Override
     public void onListenerConnected() {
@@ -27,16 +28,25 @@ public class GuardRevival extends NotificationListenerService {
                 public void onReceive(Context context, Intent intent) {
                     stopWaiting();
                     GuardKeep.ensureHomeKey(GuardRevival.this);
+                    startNowPlaying();
                 }
             };
             registerReceiver(unlocked, new IntentFilter(Intent.ACTION_USER_UNLOCKED));
             if (users.isUserUnlocked()) {
                 stopWaiting();
                 GuardKeep.ensureHomeKey(this);
+                startNowPlaying();
             }
             return;
         }
         GuardKeep.ensureHomeKey(this);
+        startNowPlaying();
+    }
+
+    private void startNowPlaying() {
+        if (nowPlaying != null) nowPlaying.close();
+        nowPlaying = new AndroidNowPlaying(getApplicationContext());
+        nowPlaying.start();
     }
 
     private void stopWaiting() {
@@ -49,7 +59,17 @@ public class GuardRevival extends NotificationListenerService {
     }
 
     @Override
+    public void onListenerDisconnected() {
+        stopWaiting();
+        if (nowPlaying != null) nowPlaying.close();
+        nowPlaying = null;
+        super.onListenerDisconnected();
+    }
+
+    @Override
     public void onDestroy() {
+        if (nowPlaying != null) nowPlaying.close();
+        nowPlaying = null;
         stopWaiting();
         super.onDestroy();
     }

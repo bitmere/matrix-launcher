@@ -168,6 +168,11 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
             }, visibility = true)
         SettingsPageContent.Actions(
             buildList {
+                val nowPlayingShown = MatrixPrefs.NOW_PLAYING_ROW !in scope.repository.prefs.getStringSet(MatrixPrefs.HIDDEN_ROWS, emptySet()).orEmpty()
+                add(SettingAction(stringResource(R.string.now_playing_title), stringResource(R.string.now_playing_settings_detail),
+                    checked = nowPlayingShown) {
+                    scope.repository.rowShown(MatrixPrefs.NOW_PLAYING_ROW, !nowPlayingShown)
+                })
                 add(SettingAction(stringResource(R.string.settings_channels_choose_apps_title), stringResource(R.string.settings_channels_choose_apps_detail)) { scope.push("sources") })
                 add(SettingAction(stringResource(R.string.settings_channels_rows_order_title), stringResource(R.string.settings_channels_rows_order_detail)) {
                     scope.openOrderPage(orderPage)

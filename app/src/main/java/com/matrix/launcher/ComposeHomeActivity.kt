@@ -30,10 +30,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 
 /** Lifecycle-owned Home data and navigation. Accessibility takeover remains an explicit setting. */
 class ComposeHomeActivity : ComponentActivity() {
     private lateinit var repository: ComposeHomeRepository
+    private var nowPlayingJob: Job? = null
     private var snapshot by mutableStateOf(HomeSnapshot())
     private var loading by mutableStateOf(false)
     private var reloadStatus by mutableStateOf("")
@@ -204,6 +207,10 @@ class ComposeHomeActivity : ComponentActivity() {
         super.onStart(); listingsAllowed = checkSelfPermission("android.permission.READ_TV_LISTINGS") == PackageManager.PERMISSION_GRANTED
         HomeRecovery.verifyWhenVisible(this); refresh(); scheduleIdle()
         observeListings()
+        nowPlayingJob = lifecycleScope.launch {
+            combine(NowPlayingMedia.state, repository.settingsState.snapshot) { item, _ -> item }
+                .collect { item -> snapshot = repository.withNowPlaying(snapshot, item) }
+        }
     }
     private fun observeListings() {
         if (!observing && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && checkSelfPermission("android.permission.READ_TV_LISTINGS") == PackageManager.PERMISSION_GRANTED) {
@@ -218,6 +225,7 @@ class ComposeHomeActivity : ComponentActivity() {
         super.onResume(); stoppedSinceResume = false
     }
     override fun onStop() {
+        nowPlayingJob?.cancel(); nowPlayingJob = null
         stoppedSinceResume = true
         idleHandler.removeCallbacks(idleClock)
         if (observing) { contentResolver.unregisterContentObserver(observer); observing = false }
@@ -240,7 +248,7 @@ class ComposeHomeActivity : ComponentActivity() {
         loading = true
         if (force) { reloadStatus = "Reloading Home…"; notice(reloadStatus) }
         try {
-            snapshot = repository.load(force)
+            snapshot = repository.withNowPlaying(repository.load(force))
             if (force) {
                 reloadStatus = "Home reload finished. " + snapshot.status
                 notice(reloadStatus)
