@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.15 — stable
+
+- Card focus border cleanup: removed the redundant solid white outer `ClassicCard` border (`Border.None`) so focused cards frame cleanly with the artwork's fitted `MatrixGlassBorder` glow rim, focus scale, and highlighted card title.
+- Card & grid performance: isolated animated glow and rim passes in `MatrixArtwork` and `NowPlayingCard` via shared `MatrixGlassBorderHolder` leaves so 12 s sweep frames do not redraw artwork, badges, or frost blur; moved focus-palette sampling into the draw phase; cached `PosterStateMark` paths via `drawWithCache`; replaced per-card `Calendar` allocation with `Year.now()`, skipped empty `ImageRequest`s, and added `contentType` / `itemsIndexed` across card grids and lists.
+- Tests: 314 JVM tests, all passing; lint 0 errors, 0 warnings.
+
 ## 2.7.14 — stable
 
 - Now Playing polish & leak fix: avoid re-extracting and re-scaling media artwork bitmaps on every playback-state tick, avoid a 1×1 initial wallpaper request before backdrop measurement, and decouple `NowPlayingMedia` from `Context`-holding instances.

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -185,6 +186,56 @@ internal class MatrixGlassBorder(private val bounds: android.graphics.RectF, pri
         paint.strokeWidth = stroke
         paint.alpha = (255 * alpha).toInt().coerceIn(0, 255)
         canvas.drawRoundRect(bounds, radius, radius, paint)
+    }
+}
+
+/** Caches one [MatrixGlassBorder] instance per card so glow/rim leaves skip redundant shader allocation. */
+@Stable
+internal class MatrixGlassBorderHolder {
+    private var border: MatrixGlassBorder? = null
+    private var width = -1f
+    private var height = -1f
+    private var offset = -1f
+    private var radius = -1f
+    private var stroke = -1f
+    private var spread = -1f
+    private var palette: ArtworkPalette? = null
+
+    fun resolve(
+        width: Float,
+        height: Float,
+        offset: Float,
+        radius: Float,
+        stroke: Float,
+        spread: Float,
+        palette: ArtworkPalette
+    ): MatrixGlassBorder? {
+        if (width <= 0f || height <= 0f) return null
+        if (border == null ||
+            this.width != width ||
+            this.height != height ||
+            this.offset != offset ||
+            this.radius != radius ||
+            this.stroke != stroke ||
+            this.spread != spread ||
+            this.palette != palette
+        ) {
+            this.width = width
+            this.height = height
+            this.offset = offset
+            this.radius = radius
+            this.stroke = stroke
+            this.spread = spread
+            this.palette = palette
+            border = MatrixGlassBorder(
+                android.graphics.RectF(0f - offset, 0f - offset, width + offset, height + offset),
+                radius,
+                stroke,
+                palette,
+                spread
+            )
+        }
+        return border
     }
 }
 

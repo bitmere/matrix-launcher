@@ -3,7 +3,7 @@ package com.matrix.launcher
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,10 +47,10 @@ internal fun MatrixAppGrid(page: String, snapshot: HomeSnapshot, repository: Com
         }
         MatrixScrollViewport(Modifier.weight(1f)) {
         LazyVerticalGrid(GridCells.Fixed(HomeCardSizing.APP_COLUMNS), state = grid, modifier = Modifier.fillMaxSize().matrixScrollEdges({ grid.canScrollBackward }, { grid.canScrollForward }), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp)) {
-            items(snapshot.apps, key = { it.id }) { app -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            itemsIndexed(snapshot.apps, key = { _, app -> app.id }, contentType = { _, _ -> "app" }) { index, app -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 MatrixAppCard(app, repository, appWidth, { _, color -> MatrixAppearance.focusApp(color) }, modifier = (if (app.id == restoreId) Modifier.focusRequester(first) else Modifier).matrixChoice(checked = if (page == "apps") null else app.id in selected)
-                    .onFocusChanged { if (it.isFocused) { focusedApp = app.id; inspection?.focusedOption = ids.indexOf(app.id); inspection?.focusedState = "app" }
-                        else if (inspection?.focusedOption == ids.indexOf(app.id)) { inspection.focusedOption = -1; inspection.focusedState = "none" } }, onLongClick = { hold(app) }) {
+                    .onFocusChanged { if (it.isFocused) { focusedApp = app.id; inspection?.focusedOption = index; inspection?.focusedState = "app" }
+                        else if (inspection?.focusedOption == index) { inspection.focusedOption = -1; inspection.focusedState = "none" } }, onLongClick = { hold(app) }) {
                     if (page == "apps") open(app) else {
                         selectedIds = ArrayList(selected.toMutableSet().apply { if (!add(app.id)) remove(app.id) })
                     }

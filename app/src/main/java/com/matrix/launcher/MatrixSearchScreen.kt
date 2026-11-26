@@ -514,7 +514,7 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, windowWidth: 
                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                itemsIndexed(matchedApps, key = { _, app -> app.id }) { index, app ->
+                                itemsIndexed(matchedApps, key = { _, app -> app.id }, contentType = { _, _ -> "app" }) { index, app ->
                                     MatrixAppCard(
                                         app = app,
                                         repository = repository,
