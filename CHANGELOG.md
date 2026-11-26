@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.13 — stable
+
+- Now Playing card (PR #16): its own glass row at the top of Home, shown only while something is playing or paused — artwork and title plus the channel or app line, with play/pause and skip controls. No progress bar in v1. A show/hide toggle in Settings, on by default. Note: Notification access must be enabled on the TV for the card to appear (Settings → Apps → Special app access → Notification access).
+- Tests: 313 JVM tests, all passing; lint 0 errors, 6 warnings.
+
 ## 2.7.12 — stable
 
 - Updater settle fix (PR #14): after a 2.7.11 install attempt, the updater no longer fails every retry — it now checks whether the saved install session still exists before clearing it, treats a missing or not-owned session as already settled, and logs the error and session id instead of hiding it.
