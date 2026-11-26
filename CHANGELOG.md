@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.14 — stable
+
+- Now Playing polish & leak fix: avoid re-extracting and re-scaling media artwork bitmaps on every playback-state tick, avoid a 1×1 initial wallpaper request before backdrop measurement, and decouple `NowPlayingMedia` from `Context`-holding instances.
+- Search & service reliability: restore matching AI summary on cached AI searches, guard receiver unregistration in `HomeKeyService`, and use non-deprecated `ACTION_DELETE` in `AppManagement`.
+- Cleanup: resolve all compiler and lint warnings (KTX extensions, `onEnter` focus properties, backup nullability, unused string removal) and refresh project documentation.
+- Tests: 314 JVM tests, all passing; lint 0 errors, 0 warnings.
+
 ## 2.7.13 — stable
 
 - Now Playing card (PR #16): its own glass row at the top of Home, shown only while something is playing or paused — artwork and title plus the channel or app line, with play/pause and skip controls. No progress bar in v1. A show/hide toggle in Settings, on by default. Note: Notification access must be enabled on the TV for the card to appear (Settings → Apps → Special app access → Notification access).

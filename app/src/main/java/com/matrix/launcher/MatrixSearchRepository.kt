@@ -75,7 +75,7 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
     val ai = MatrixAiClient(prefs, context).apply {
         onConfigurationChanged = { clearCache() }
     }
-    private data class Cached(val at: Long, val cards: List<MediaCard>)
+    private data class Cached(val at: Long, val cards: List<MediaCard>, val aiSummary: String = "")
     private val cache = object : LinkedHashMap<String, Cached>(8, .75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Cached>?) = size > 8
     }
@@ -83,7 +83,7 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 128
     }
     private val suggestionsLock = Any()
-    var lastAiSummary: String = ""
+    @Volatile var lastAiSummary: String = ""
     var tmdbKey: String
         get() = prefs.getString("tmdb_api_key", "").orEmpty()
         set(value) { prefs.edit { putString("tmdb_api_key", value.trim()) }; clearCache() }
@@ -212,10 +212,13 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
      * fresh entry (at most 10 minutes old) is returned. Internal so the
      * force-refresh bypass test can assert the decision directly.
      */
-    internal fun cachedSearchCards(key: String, forceRefresh: Boolean): List<MediaCard>? {
+    internal fun cachedSearchCards(key: String, forceRefresh: Boolean): List<MediaCard>? =
+        cachedSearchEntry(key, forceRefresh)?.cards
+
+    private fun cachedSearchEntry(key: String, forceRefresh: Boolean): Cached? {
         if (forceRefresh) return null
         val now = System.currentTimeMillis()
-        return synchronized(cache) { cache[key]?.takeIf { now - it.at in 0..600_000 } }?.cards
+        return synchronized(cache) { cache[key]?.takeIf { now - it.at in 0..600_000 } }
     }
 
     /**
@@ -240,8 +243,12 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
         require(query.length in 2..120) { "Enter 2–120 characters." }
         val key = searchCacheKey(provider, rawQuery)
         val now = System.currentTimeMillis()
-        val saved = cachedSearchCards(key, forceRefresh)
-        saved ?: when (provider) {
+        val saved = cachedSearchEntry(key, forceRefresh)
+        if (saved != null) {
+            if (provider == MatrixSearchProvider.AI) lastAiSummary = saved.aiSummary
+            return@withContext saved.cards
+        }
+        when (provider) {
             MatrixSearchProvider.CATALOG -> cinemetaSearch(query, onProgress).getOrElse {
                 throw CatalogUnavailableException(it)
             }
@@ -254,7 +261,8 @@ internal class MatrixSearchRepository(private val prefs: SharedPreferences, priv
         }.distinctBy { it.id }.also {
             if (it.isNotEmpty()) {
                 addRecentSearch(query)
-                synchronized(cache) { cache[key] = Cached(now, it) }
+                val summary = if (provider == MatrixSearchProvider.AI) lastAiSummary else ""
+                synchronized(cache) { cache[key] = Cached(now, it, summary) }
             }
         }
     }

@@ -19,7 +19,11 @@ internal class PackageInstallerSessionStore(private val installer: PackageInstal
 internal object PendingUpdateSession {
     private fun prefs(context: Context) = context.getSharedPreferences("matrix_update_session", Context.MODE_PRIVATE)
     fun save(context: Context, id: Int, version: Long, file: File) {
-        check(prefs(context).edit().putInt("id", id).putLong("version", version).putString("path", file.absolutePath).commit())
+        prefs(context).edit(commit = true) {
+            putInt("id", id)
+            putLong("version", version)
+            putString("path", file.absolutePath)
+        }
     }
     fun matches(context: Context, id: Int, version: Long, path: String?): Boolean {
         val state = prefs(context)

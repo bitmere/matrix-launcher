@@ -91,7 +91,7 @@ When the AI CLI or installer first connects to your TV, a prompt will appear on 
 The project's installer (`scripts/install-compose-preview.ps1`) automates the full deployment pipeline:
 1. **ADB Handshake**: Connects to `<TV_IP>:5555`.
 2. **Release Artifact Verification**: Reads `artifacts/release-manifest.json`, locates its named APK under `artifacts/` and verifies the APK SHA-256. Stage the exact approved Actions APK and a matching manifest before using this helper.
-3. **Safe Package Install**: Uses `pm install -r` to reinstall with data preserved only when signing certificates are compatible. It does not bypass the next-release signer transition or automatically uninstall the old app.
+3. **Safe Package Install**: Uses `pm install -r` to reinstall with data preserved only when signing certificates are compatible (`2.7.6+` bitmere releases). It does not automatically uninstall an older pre-2.7.6 signer build.
 4. **ART Speed Compilation (`-Compile`)**:
    - Invokes `cmd package compile -m speed com.matrix.launcher` on the TV.
    - Precompiles all Kotlin and Compose bytecode directly into optimized native machine code (`dex2oat`).
@@ -171,4 +171,3 @@ powershell -ExecutionPolicy Bypass -File tools/adb_tv.ps1 shell dumpsys activity
 Budget and mid-range smart TVs (TCL, Realme, Xiaomi) ship with only 1GB–2GB RAM and preload heavy background loggers and ad channels.
 
 - **TCL Smart TV Pro Optimization & Rollback**: See [TCL Smart TV Pro Optimization & Debloat Log](TCL-SMART-TV-PRO-OPTIMIZATION.md) for the 28 safe packages disabled, memory benchmarks (+257MB free RAM), and rollback script.
-- **Universal Android TV Debloat Guide**: See `personal-home-tv/docs/TV-DEBLOAT-AND-OPTIMIZATION-GUIDE.md` and `tools/debloat-tv.ps1` for automated package auditing and debloating across other TV models.

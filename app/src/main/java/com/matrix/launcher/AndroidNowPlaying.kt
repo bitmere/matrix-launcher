@@ -10,35 +10,41 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.HandlerThread
+import androidx.core.graphics.scale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 internal data class NowPlayingItem(val session: NowPlayingSession, val artwork: Any?)
 
+internal interface NowPlayingCommandTarget {
+    fun command(id: String, command: NowPlayingCommand)
+}
+
 /** In-memory only; the listener owns the adapter and clears it when access ends. */
 internal object NowPlayingMedia {
     private val mutable = MutableStateFlow<NowPlayingItem?>(null)
     val state = mutable.asStateFlow()
-    @Volatile private var adapter: AndroidNowPlaying? = null
-    @Synchronized fun attach(owner: AndroidNowPlaying) { adapter = owner; mutable.value = null }
-    @Synchronized fun detach(owner: AndroidNowPlaying) {
+    @Volatile private var adapter: NowPlayingCommandTarget? = null
+    @Synchronized fun attach(owner: NowPlayingCommandTarget) { adapter = owner; mutable.value = null }
+    @Synchronized fun detach(owner: NowPlayingCommandTarget) {
         if (adapter === owner) { adapter = null; mutable.value = null }
     }
-    @Synchronized fun publish(owner: AndroidNowPlaying, value: NowPlayingItem?) {
+    @Synchronized fun publish(owner: NowPlayingCommandTarget, value: NowPlayingItem?) {
         if (adapter === owner) mutable.value = value
     }
     fun command(id: String, command: NowPlayingCommand) { adapter?.command(id, command) }
 }
 
 /** All framework reads, package lookups and transport calls are serialized off the UI thread. */
-internal class AndroidNowPlaying(private val context: Context) : NowPlayingSessionStore {
+internal class AndroidNowPlaying(context: Context) : NowPlayingSessionStore, NowPlayingCommandTarget {
+    private val app = context.applicationContext
     private val thread = HandlerThread("MatrixNowPlaying").apply { start() }
     private val handler = Handler(thread.looper)
-    private val manager by lazy { context.getSystemService(MediaSessionManager::class.java) }
-    private val listenerComponent = ComponentName(context.packageName, "com.gathin.tvhome.GuardRevival")
+    private val manager by lazy { app.getSystemService(MediaSessionManager::class.java) }
+    private val listenerComponent = ComponentName(app.packageName, "com.gathin.tvhome.GuardRevival")
     private data class Entry(val id: String, val controller: MediaController, val callback: MediaController.Callback,
-        var metadata: MediaMetadata? = null, var artwork: Any? = null)
+        var metadataLoaded: Boolean = false, var artwork: Any? = null)
     private val entries = linkedMapOf<MediaSession.Token, Entry>()
     private var registered = false
     @Volatile private var closed = false
@@ -77,7 +83,15 @@ internal class AndroidNowPlaying(private val context: Context) : NowPlayingSessi
             ordered[token] = entries[token] ?: run {
                 val callback = object : MediaController.Callback() {
                     override fun onPlaybackStateChanged(state: PlaybackState?) { guarded { publish() } }
-                    override fun onMetadataChanged(metadata: MediaMetadata?) { guarded { publish() } }
+                    override fun onMetadataChanged(metadata: MediaMetadata?) {
+                        guarded {
+                            entries[token]?.let {
+                                it.metadataLoaded = true
+                                it.artwork = runCatching { artwork(metadata) }.getOrNull()
+                            }
+                            publish()
+                        }
+                    }
                     override fun onSessionDestroyed() {
                         guarded {
                             entries.remove(token)?.let { runCatching { it.controller.unregisterCallback(it.callback) } }
@@ -111,8 +125,8 @@ internal class AndroidNowPlaying(private val context: Context) : NowPlayingSessi
         val metadata = controller.metadata
         val title = metadata?.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)?.toString()?.takeIf { it.isNotBlank() }
             ?: metadata?.getText(MediaMetadata.METADATA_KEY_TITLE)?.toString()?.takeIf { it.isNotBlank() }
-            ?: context.getString(R.string.now_playing_title)
-        NowPlayingSession(entry.id, title, TvFeed.appName(context, controller.packageName), status,
+            ?: app.getString(R.string.now_playing_title)
+        NowPlayingSession(entry.id, title, TvFeed.appName(app, controller.packageName), status,
             NowPlayingPolicy.commands(status, supports(PlaybackState.ACTION_PLAY), supports(PlaybackState.ACTION_PAUSE),
                 supports(PlaybackState.ACTION_PLAY_PAUSE), supports(PlaybackState.ACTION_SKIP_TO_PREVIOUS), supports(PlaybackState.ACTION_SKIP_TO_NEXT)))
     }
@@ -120,10 +134,9 @@ internal class AndroidNowPlaying(private val context: Context) : NowPlayingSessi
     private fun publish() {
         val selected = NowPlayingPolicy.select(sessions())
         val entry = entries.values.firstOrNull { it.id == selected?.id }
-        val metadata = entry?.controller?.metadata
-        if (entry != null && metadata !== entry.metadata) {
-            entry.metadata = metadata
-            entry.artwork = runCatching { artwork(metadata) }.getOrNull()
+        if (entry != null && !entry.metadataLoaded) {
+            entry.metadataLoaded = true
+            entry.artwork = runCatching { artwork(entry.controller.metadata) }.getOrNull()
         }
         NowPlayingMedia.publish(this, selected?.let { NowPlayingItem(it, entry?.artwork) })
     }
@@ -142,11 +155,11 @@ internal class AndroidNowPlaying(private val context: Context) : NowPlayingSessi
     private fun thumbnail(bitmap: Bitmap): Bitmap {
         val edge = maxOf(bitmap.width, bitmap.height)
         if (edge <= 256) return bitmap
-        return Bitmap.createScaledBitmap(bitmap, (bitmap.width * 256 / edge).coerceAtLeast(1),
-            (bitmap.height * 256 / edge).coerceAtLeast(1), true)
+        return bitmap.scale((bitmap.width * 256 / edge).coerceAtLeast(1),
+            (bitmap.height * 256 / edge).coerceAtLeast(1))
     }
 
-    fun command(id: String, command: NowPlayingCommand) {
+    override fun command(id: String, command: NowPlayingCommand) {
         handler.post { guarded { NowPlayingPolicy.dispatch(this, id, command) } }
     }
 

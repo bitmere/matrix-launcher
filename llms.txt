@@ -4,7 +4,7 @@
 
 ## Updates
 
-The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size and SHA-256 sidecar, and the package, version and bitmere signer before installation.
+The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size, the release-notes SHA-256 (with sidecar fallback), and the package, version and bitmere signer before installation.
 
 ## AI Handover & Architecture Map
 - [Documentation Index](docs/README.md): Guides, release records, roadmap and historical references.
@@ -19,7 +19,8 @@ The manual updater reads the latest stable GitHub Release in `bitmere/matrix-lau
 - [App Feature Module](app/src/main/java/com/matrix/launcher): Compose UI, TV Material 3, search providers, AOT manager, and AI integration.
 
 ## Key Subsystems & Source Files
-- [Focus & Row Navigation](app/src/main/java/com/matrix/launcher/MatrixFocusRow.kt): Focus restoration with `fallback` focus requesters, `focusProperties.enter` direct routing, boundary trap cancellation, and `LazyLayoutCacheWindow`.
+- [Focus & Row Navigation](app/src/main/java/com/matrix/launcher/MatrixFocusRow.kt): Focus restoration with `fallback` focus requesters, `focusProperties.onEnter` direct routing, boundary trap cancellation, and `LazyLayoutCacheWindow`.
+- [Now Playing Card](app/src/main/java/com/matrix/launcher/NowPlayingCard.kt): Top Home row observing `MediaSessionManager` via `GuardRevival` ([AndroidNowPlaying.kt](app/src/main/java/com/matrix/launcher/AndroidNowPlaying.kt)) with frosted backdrop blur and play/pause/skip controls.
 - [Home Screen & Dock](app/src/main/java/com/matrix/launcher/MatrixHomeScreen.kt): Apple-style Home, favorites dock, capture-phase dialog key filtering (`sawFreshDown`), AOT performance settings, and D-pad navigation.
 - [Menu & Action Options](app/src/main/java/com/matrix/launcher/MatrixMenu.kt): TV Material settings menus with `sawMenuDown` guard preventing trailing long-press key release from auto-clicking options.
 - [AOT Speed Manager](app/src/main/java/com/matrix/launcher/AotOptimizationManager.kt): Embedded local ADB loopback client (`dadb`) over `127.0.0.1:5555` with `AotPackageUpdateReceiver` for automatic AOT `speed` compilation of Stremio and Nuvio without Shizuku or PC.
@@ -36,5 +37,5 @@ The manual updater reads the latest stable GitHub Release in `bitmere/matrix-lau
 - Build Preview APK: `powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Preview`
 - Run Unit Tests: `powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Test`
 - Keyless tests/lint: `powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Mode Check`. Signed optimized releases are built only by GitHub Actions with existing secrets.
-- Install the exact verified optimized Actions APK; see [Actions download and signer-transition warning](docs/NEW-TV-INSTALL.md). The next release needs a clean install over the retired signer, losing settings.
+- Install the exact verified optimized Actions APK; see [installation guidance](docs/NEW-TV-INSTALL.md). Clean install is only needed when upgrading from pre-2.7.6 builds signed with the retired key; 2.7.6+ releases update in place.
 - Inspect TV UI hierarchy (NO screenshots): `adb -s <IP>:5555 shell dumpsys activity com.matrix.launcher --matrix-ui`

@@ -2,7 +2,7 @@
 
 ## Current validation: awaiting overseer run
 
-Source baseline: 2.7.4, versionCode 153 (2026-11-16). No current build, lint, JVM or device results are asserted here. The overseer will record the source SHA, environment, actual test counts, lint results, report paths and device limits after validation.
+Source baseline: 2.7.14, versionCode 163. No current build, lint, JVM or device results are asserted here. The overseer will record the source SHA, environment, actual test counts, lint results, report paths and device limits after validation.
 
 ```sh
 ./gradlew --no-daemon :app:testDebugUnitTest :core:test :app:lint :app:assembleDebug

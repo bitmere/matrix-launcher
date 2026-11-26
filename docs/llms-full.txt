@@ -8,8 +8,8 @@
 
 ### 1.1 Core Principles
 - **Target Platform**: Android TV / Google TV (API 26+ / Android 8.0 through Android 14+). Target device: TCL Smart TV (`192.168.29.219:5555`).
-- **Independent Repository**: Independent from legacy Java checkouts. Installed package is `com.matrix.launcher` with base package `com.matrix.launcher`. Current source version is `v2.7.6` (`versionCode 155`). The historical baseline recorded on 2026-11-16 was `v2.7.4` (`versionCode 153`).
-- **Updater**. The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size and SHA-256 sidecar, and the package, version and bitmere signer before installation.
+- **Independent Repository**: Independent from legacy Java checkouts. Installed package is `com.matrix.launcher` with base package `com.matrix.launcher`. Current source version is `v2.7.14` (`versionCode 163`). The historical baseline recorded on 2026-11-16 was `v2.7.4` (`versionCode 153`).
+- **Updater**. The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size, the release-notes SHA-256 (with sidecar fallback), and the package, version and bitmere signer before installation.
 - **Modular Division**:
   - `:core`: Pure, Android-free Kotlin library. Contains media models, link schemas (`matrix-title://`, `stremio://`), link builders, and formatting utilities. Must NEVER depend on Android SDK classes (`android.*`).
   - `:app`: Android application module with Jetpack Compose for TV (`androidx.tv:tv-material`), platform adapters, storage, network clients, MCP tool engines, AOT manager, and feature screens.
@@ -30,7 +30,7 @@
   - **Entry Routing**: Inside `MatrixFocusRow.kt`:
     ```kotlin
     Modifier.focusRestorer(fallback).focusProperties {
-        enter = { if (fallback != FocusRequester.Default) fallback else FocusRequester.Default }
+        onEnter = { if (fallback != FocusRequester.Default) fallback.requestFocus() }
         onExit = {
             if (requestedFocusDirection == FocusDirection.Left || requestedFocusDirection == FocusDirection.Right) cancelFocusChange()
             if (isLastRow && requestedFocusDirection == FocusDirection.Down) cancelFocusChange()

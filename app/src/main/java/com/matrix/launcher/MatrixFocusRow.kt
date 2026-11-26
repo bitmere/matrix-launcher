@@ -46,8 +46,8 @@ internal fun MatrixFocusRow(state: LazyListState, horizontalInset: Dp, preferred
         CompositionLocalProvider(LocalBringIntoViewSpec provides reveal) {
             LazyRow(state = state,
                 modifier = Modifier.width(with(density) { fit.viewport.toDp() }).focusRestorer(fallback).focusProperties {
-                    enter = {
-                        if (fallback != FocusRequester.Default) fallback else FocusRequester.Default
+                    onEnter = {
+                        if (fallback != FocusRequester.Default) fallback.requestFocus()
                     }
                     onExit = {
                         if (requestedFocusDirection == FocusDirection.Left || requestedFocusDirection == FocusDirection.Right) cancelFocusChange()

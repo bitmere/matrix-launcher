@@ -82,4 +82,39 @@ class NowPlayingSessionTest {
         assertFalse(NowPlayingPolicy.dispatch(store, "old", NowPlayingCommand.Play))
         assertTrue(store.sent.isEmpty())
     }
+
+    @Test fun mediaHubRoutesCommandsOnlyToCurrentOwnerAndClearsOnDetach() {
+        val first = object : NowPlayingCommandTarget {
+            val commands = mutableListOf<Pair<String, NowPlayingCommand>>()
+            override fun command(id: String, command: NowPlayingCommand) { commands += id to command }
+        }
+        val second = object : NowPlayingCommandTarget {
+            val commands = mutableListOf<Pair<String, NowPlayingCommand>>()
+            override fun command(id: String, command: NowPlayingCommand) { commands += id to command }
+        }
+        try {
+            NowPlayingMedia.attach(first)
+            val item = NowPlayingItem(session("one"), null)
+            NowPlayingMedia.publish(first, item)
+            assertEquals(item, NowPlayingMedia.state.value)
+            NowPlayingMedia.command("one", NowPlayingCommand.Pause)
+            assertEquals(listOf("one" to NowPlayingCommand.Pause), first.commands)
+
+            NowPlayingMedia.attach(second)
+            assertNull(NowPlayingMedia.state.value)
+            NowPlayingMedia.publish(first, item)
+            assertNull(NowPlayingMedia.state.value)
+
+            NowPlayingMedia.detach(first)
+            NowPlayingMedia.command("one", NowPlayingCommand.Next)
+            assertEquals(listOf("one" to NowPlayingCommand.Next), second.commands)
+
+            NowPlayingMedia.publish(second, item)
+            NowPlayingMedia.detach(second)
+            assertNull(NowPlayingMedia.state.value)
+        } finally {
+            NowPlayingMedia.detach(first)
+            NowPlayingMedia.detach(second)
+        }
+    }
 }

@@ -4,7 +4,7 @@ For repository navigation, see the [documentation index](README.md) and [tool in
 
 ## Project State Overview
 - **Repository**: `matrix-launcher` (Independent Kotlin / Jetpack Compose for Android TV).
-- **Current Version**: `v2.7.6` (`versionCode 155`, `releaseChannel=stable`).
+- **Current Version**: `v2.7.14` (`versionCode 163`, `releaseChannel=stable`).
 - **Target Device**: TCL Android TV (`192.168.29.219:5555`).
 - **Application Package**: `com.matrix.launcher`
 - **Main Activity**: `com.matrix.launcher.ComposeHomeActivity` (alias: `com.gathin.tvhome.ComposeHomeActivity`).
@@ -17,7 +17,7 @@ For repository navigation, see the [documentation index](README.md) and [tool in
 - **Row-to-Row Retention**: Favorites row and channel rows must never reset to index 0 when navigating vertically.
   - Favorites row tracks `focusedFavId` (`rememberSaveable`) and `favRetained` (`FocusRequester`), passed as `fallback` to `MatrixFocusRow`.
   - Channel rows pass remembered card `retained` focus requester as `fallback`.
-  - In `MatrixFocusRow.kt`: `focusProperties { enter = { if (fallback != FocusRequester.Default) fallback else FocusRequester.Default } }` ensures entering a row lands on the remembered card.
+  - In `MatrixFocusRow.kt`: `focusProperties { onEnter = { if (fallback != FocusRequester.Default) fallback.requestFocus() } }` ensures entering a row lands on the remembered card.
   - Rows use `LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 1f)` so nearby and retained items stay composed.
 - **Boundary Traps**: Header Up (`FocusDirection.Up`) and bottom channel Down (`FocusDirection.Down`) cancel focus change to prevent escaping into the void or traps.
 
@@ -38,8 +38,8 @@ For repository navigation, see the [documentation index](README.md) and [tool in
 ### 4. Build & Toolchain
 - **Gradle 9.0 Clean**: All Groovy build script assignments in `app/build.gradle` use `=` assignment syntax (e.g. `namespace = 'com.matrix.launcher'`, `compose = true`, `minifyEnabled = true`).
 - **Dependencies**: Java 17 toolchain, Android SDK 36, compileSdk 36, targetSdk 34, minSdk 26.
-- **Signing**: Existing release keys/passwords are GitHub Actions secrets only. Local Preview, Check and Test modes remain keyless; `scripts/build.ps1 -Checks` selects Release mode and is blocked locally; the Actions release workflow builds and verifies the optimized APK directly. Use the exact verified optimized Actions APK for device checks. The next release requires a clean install and settings loss over retired signer `15198ed1…`; the new signer begins `bd4e6bf1…`. See [installation guidance](NEW-TV-INSTALL.md).
-- **Testing on TV**: Strictly adhere to user requirement: **Do NOT take screenshots for testing; use UI Automator inspection dumps and dumpsys** (`dumpsys activity com.matrix.launcher --matrix-ui`).
+- **Signing**: Existing release keys/passwords are GitHub Actions secrets only. Local Preview, Check and Test modes remain keyless; `scripts/build.ps1 -Checks` selects Release mode and is blocked locally; the Actions release workflow builds and verifies the optimized APK directly. Use the exact verified optimized Actions APK for device checks. Releases from 2.7.6 onward use the bitmere signer (`a21fc7cb…`) and update in place; a clean install is only needed when migrating from a pre-2.7.6 build signed with the retired key. See [installation guidance](NEW-TV-INSTALL.md).
+- **Testing on TV**: Verify TV behavior through UI Automator XML, D-pad, and `dumpsys activity com.matrix.launcher --matrix-ui` first; use targeted screenshots only when visual verification is required.
 
 ---
 

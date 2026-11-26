@@ -97,11 +97,15 @@ internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus:
                 .semantics { stateDescription = stateLabel }
                 .then(cardAction), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(MatrixLayout.gap)) {
+                val context = LocalContext.current
+                val artworkRequest = remember(context, item.artwork) {
+                    item.artwork?.let { ImageRequest.Builder(context).data(it).size(256).build() }
+                }
                 Box(Modifier.size(76.dp).clip(RoundedCornerShape(MatrixLayout.cardCorner))
                     .background(MatrixControlStyle.fill(MaterialTheme.colorScheme)), contentAlignment = Alignment.Center) {
                     Icon(painterResource(R.drawable.ic_now_playing), null, Modifier.size(MatrixControlStyle.iconSize))
-                    if (item.artwork != null) AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(item.artwork).size(256).build(),
+                    if (artworkRequest != null) AsyncImage(
+                        model = artworkRequest,
                         contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -143,10 +147,14 @@ private fun NowPlayingFrost(wallpaper: String?, modifier: Modifier) {
     val capabilities = LocalMatrixCapabilities.current
     var offset by remember { mutableStateOf(Offset.Zero) }
     val backdropSize = backdrop?.size ?: androidx.compose.ui.unit.IntSize.Zero
-    val painter = rememberAsyncImagePainter(
-        if (wallpaper != null && capabilities.wallpaper) ImageRequest.Builder(LocalContext.current).data(wallpaper)
-            .size(backdropSize.width.coerceIn(1, 1920), backdropSize.height.coerceIn(1, 1080)).build() else null,
-        contentScale = ContentScale.Crop)
+    val context = LocalContext.current
+    val wallpaperRequest = remember(context, wallpaper, capabilities.wallpaper, backdropSize) {
+        if (wallpaper != null && capabilities.wallpaper && backdropSize.width > 0 && backdropSize.height > 0) {
+            ImageRequest.Builder(context).data(wallpaper)
+                .size(backdropSize.width.coerceIn(1, 1920), backdropSize.height.coerceIn(1, 1080)).build()
+        } else null
+    }
+    val painter = rememberAsyncImagePainter(wallpaperRequest, contentScale = ContentScale.Crop)
     val dim = remember(backdropSize.height) { Brush.verticalGradient(listOf(Color.Black.copy(alpha = .65f),
         Color.Black.copy(alpha = .35f), Color.Black.copy(alpha = .85f)), endY = backdropSize.height.coerceAtLeast(1).toFloat()) }
     Box(modifier.onGloballyPositioned { coordinates ->

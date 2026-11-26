@@ -1,6 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="matrix_compose_candidate">Matrix Launcher</string>
     <color name="home_background">#FF000000</color>
     <color name="home_artwork_fallback">#FF1C1C1E</color>
     <color name="home_panel">#FF1C1E24</color>
