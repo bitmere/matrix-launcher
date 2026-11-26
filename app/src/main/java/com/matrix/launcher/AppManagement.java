@@ -22,7 +22,7 @@ final class AppManagement {
     static Intent intent(Context context,String pkg){
         if(!PackageNames.validPackage(pkg))return null;
         if(canUninstall(context,pkg)){
-            Intent request=new Intent(Intent.ACTION_UNINSTALL_PACKAGE,Uri.fromParts("package",pkg,null));
+            Intent request=new Intent(Intent.ACTION_DELETE,Uri.fromParts("package",pkg,null));
             ResolveInfo handler=context.getPackageManager().resolveActivity(request,PackageManager.MATCH_DEFAULT_ONLY|PackageManager.MATCH_SYSTEM_ONLY);
             if(handler!=null){request.setComponent(new ComponentName(handler.activityInfo.packageName,handler.activityInfo.name));return request;}
         }

@@ -1,6 +1,6 @@
 # Matrix Launcher workflow
 
-- Matrix Launcher 2.7.6 is published in the public bitmere/matrix-launcher
+- Matrix Launcher 2.7.14 is published in the public bitmere/matrix-launcher
   GitHub repository with no mirrors. The updater reads GitHub Releases through
   the GitHub API. GitHub Actions signs releases with the bitmere keys held in
   Actions secrets.

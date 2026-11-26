@@ -16,6 +16,7 @@ class MatrixComposeApplication : Application(), ImageLoaderFactory {
         .crossfade(false).build()
 
     /** Under memory pressure the in-memory images go; the disk cache re-serves them. */
+    @Suppress("DEPRECATION") // Android 8-13 TVs still dispatch TRIM_MEMORY_RUNNING_LOW (10).
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= TRIM_MEMORY_RUNNING_LOW) Coil.imageLoader(this).memoryCache?.clear()

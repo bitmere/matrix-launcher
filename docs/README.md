@@ -18,7 +18,7 @@ Commands in documentation assume the repository root unless stated otherwise.
 - [Roadmap and TODO](TODO.md): preserved planning notes; reconcile with implemented features before starting work.
 - [AI entry point](../llms.txt) and [detailed AI reference](llms-full.txt)
 
-The detailed AI reference identifies 2.7.4/code 153. The roadmap separates implemented local tools from pending provider/device verification and stream checks, based on source review on 2026-11-16.
+The detailed AI reference targets 2.7.14/code 163 (with historical 2.7.4/code 153 baseline notes preserved). The roadmap separates implemented local tools from pending provider/device verification and stream checks, based on source review on 2026-11-16.
 AGENTS.md takes precedence over conflicting historical workflow guidance.
 
 ## Release and validation records

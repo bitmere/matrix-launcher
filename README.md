@@ -28,7 +28,7 @@ Matrix ships **one universal APK**, with no separate CPU-specific downloads.
 | Android TV | Same universal release APK |
 | Compatible Android-based Fire TV | Same universal release APK |
 
-This source targets **2.7.6** on the stable channel (versionCode **155**).
+This source targets **2.7.14** on the stable channel (versionCode **163**).
 
 1. Open the [latest release](https://github.com/bitmere/matrix-launcher/releases/latest) and download its optimized signed APK. The SHA-256 is in the release notes.
 2. Transfer the APK to your TV, open it with an installer/file manager, and allow installation from that source when Android asks.
@@ -36,7 +36,7 @@ This source targets **2.7.6** on the stable channel (versionCode **155**).
 
 Use **Settings → About → Check for updates** to read the latest stable GitHub Release, view its notes and download the APK. Matrix checks the published size and SHA-256 before asking Android to install it.
 
-The installed package is `com.matrix.launcher`. The first bitmere-signed build requires a manual clean installation. Earlier installations keep their settings in their own app sandbox. See the [installation guide](docs/NEW-TV-INSTALL.md) for ADB instructions.
+The installed package is `com.matrix.launcher`. Upgrading from a pre-2.7.6 build signed with the retired key requires a manual clean installation (earlier installations keep their settings in their own app sandbox); 2.7.6 and newer bitmere releases update in place. See the [installation guide](docs/NEW-TV-INSTALL.md) for ADB instructions.
 
 ## Getting started
 
@@ -64,6 +64,7 @@ The [60-item code audit](openspec/changes/matrix-public-launch/FEATURES.md) give
 ### Home, apps and channels
 
 - A scrolling favorite dock with app artwork, selection, reordering, long-press options, app information and system-confirmed uninstall.
+- Optional **Now Playing** frosted-glass card at the top of Home while media is playing or paused, showing artwork, title/app label and supported play/pause/skip controls (requires Notification access; toggleable in **Settings → Home channels**).
 - Header clock/date, optional Search, TV Inputs, Wi-Fi/Ethernet status, network settings, refresh, All apps and Settings.
 - App-published preview channels and Watch Next with progress indicators, stale/duplicate filtering and Nuvio’s published continue-watching queue handling. Availability depends on the source app and TV provider.
 - Source selection, row/card order and visibility, per-app preview limits, portrait/landscape artwork and adjustable card sizes. Rows can be reordered and shown or hidden (OK moves a row, hold OK shows or hides it); favorites can be reordered; previews are limited to **4, 8 or 12 cards per row**.

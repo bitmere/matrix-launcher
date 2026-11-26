@@ -129,7 +129,10 @@ public class HomeKeyService extends AccessibilityService {
 
     private void stopWaitingForUnlock() {
         if (unlockReceiver == null) return;
-        unregisterReceiver(unlockReceiver);
+        try {
+            unregisterReceiver(unlockReceiver);
+        } catch (RuntimeException ignored) {
+        }
         unlockReceiver = null;
     }
 
@@ -148,7 +151,7 @@ public class HomeKeyService extends AccessibilityService {
         handler.removeCallbacksAndMessages(null);
         RemoteKeys.release(this);
         stopWaitingForUnlock();
-        if (screenOnReceiver != null) unregisterReceiver(screenOnReceiver);
+        disarmScreenOn();
         if (standbyExit != null) {
             try {
                 unregisterReceiver(standbyExit);
@@ -214,7 +217,7 @@ public class HomeKeyService extends AccessibilityService {
         boolean watchFront=!frontAppKeys.isEmpty() || !frontAppScancodes.isEmpty();
         if(matrixRedirect){
             if(consumeVolumeKeys){VolumeKeys.stop();consumeVolumeKeys=false;}
-            if(screenOnReceiver!=null){unregisterReceiver(screenOnReceiver);screenOnReceiver=null;}
+            disarmScreenOn();
             powerOnLiveTv="";powerOnUntil=0;powerOnAlways=false;
             disarmStandbyExit();
             stockHome.clear();stockHomePackage="";
@@ -255,8 +258,7 @@ public class HomeKeyService extends AccessibilityService {
         if (!powerOnLiveTv.isEmpty() || powerOnAlways) {
             armPowerOnHome();
         } else if (screenOnReceiver != null) {
-            unregisterReceiver(screenOnReceiver);
-            screenOnReceiver = null;
+            disarmScreenOn();
             powerOnUntil = 0;
         }
         // home_key_service.xml subscribes to no events, so the redirects ask for window changes only when one is on.
@@ -386,6 +388,15 @@ public class HomeKeyService extends AccessibilityService {
 
     /** How long power_on_home stays armed after the screen turns on without a reboot. */
     static final long SCREEN_ON_WINDOW_MS = 60 * 1000L;
+
+    private void disarmScreenOn() {
+        if (screenOnReceiver == null) return;
+        try {
+            unregisterReceiver(screenOnReceiver);
+        } catch (RuntimeException ignored) {
+        }
+        screenOnReceiver = null;
+    }
 
     /** power_on_home: armed for the boot window (if this bind is part of the boot) and after every screen-on. */
     private void armPowerOnHome() {

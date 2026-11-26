@@ -1,5 +1,5 @@
 # Matrix Launcher release reference
 
-The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size and SHA-256 sidecar, and the package, version and bitmere signer before installation.
+The manual updater reads the latest stable GitHub Release in `bitmere/matrix-launcher`. It checks the terminal Android version-code line, the APK size, the release-notes SHA-256 (with sidecar fallback), and the package, version and bitmere signer before installation.
 
-The current source version is 2.7.6 (Android versionCode 155). The first bitmere build requires a manual clean installation. See the [AI handover index](../llms.txt) and [detailed technical reference](llms-full.txt).
+The current source version is 2.7.14 (Android versionCode 163). Clean install is only required when upgrading from pre-2.7.6 builds; 2.7.6+ releases update in place. See the [AI handover index](../llms.txt) and [detailed technical reference](llms-full.txt).

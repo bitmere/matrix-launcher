@@ -18,7 +18,7 @@ class MatrixBackupTest {
         val decoded = MatrixBackup.decode(MatrixBackup.encode(prefs, theme)).getOrThrow()
         assertEquals(prefs, decoded.prefs)
         // Theme is stored as a parsed object; compare by content, not spacing.
-        assertEquals(org.json.JSONObject(theme).toString(), org.json.JSONObject(decoded.themeJson).toString())
+        assertEquals(org.json.JSONObject(theme).toString(), org.json.JSONObject(requireNotNull(decoded.themeJson)).toString())
     }
 
     @Test fun secretsExcludedFromExport() {

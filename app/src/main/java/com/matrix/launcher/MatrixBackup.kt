@@ -109,9 +109,10 @@ internal object MatrixBackup {
             BackupSchema.validate(key, value)
             prefs[key] = value
         }
+        val themeObj = root.optJSONObject("theme")
         val themeJson = when {
             root.isNull("theme") -> null
-            root.optJSONObject("theme") != null -> root.optJSONObject("theme").toString()
+            themeObj != null -> themeObj.toString()
             else -> root.optString("theme").takeIf { it.isNotBlank() }
         }
         themeJson?.let { require(MatrixTheme.parse(it).ignoredReason == null) { "Invalid backup theme" } }
@@ -139,6 +140,7 @@ internal object MatrixBackup {
     fun apply(context: Context, prefs: SharedPreferences, data: MatrixBackupData): Int =
         apply(context.filesDir, prefs, data)
 
+    @android.annotation.SuppressLint("ApplySharedPref") // Runs on IO; commit() is required to detect restore failure.
     internal fun apply(filesDir: File, prefs: SharedPreferences, data: MatrixBackupData): Int {
         val portable = data.prefs.filterKeys { !isSecretKey(it) }
         require(portable.size <= 1024)

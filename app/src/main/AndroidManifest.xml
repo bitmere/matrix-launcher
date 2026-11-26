@@ -29,7 +29,7 @@
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
         <intent>
-            <action android:name="android.intent.action.UNINSTALL_PACKAGE" />
+            <action android:name="android.intent.action.DELETE" />
             <data android:scheme="package" />
         </intent>
         <intent>
