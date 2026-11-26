@@ -2,7 +2,6 @@ package com.matrix.launcher
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.background
@@ -13,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -133,11 +133,8 @@ internal fun Modifier.tvCardClickable(
         }
 }
 
-internal fun focusedCardBorder(onSurface: Color): Border = Border(
-    BorderStroke(MatrixLayout.focusOutlineWidth, onSurface),
-    MatrixLayout.focusOutlineOffset,
-    MatrixCardDefaults.artworkShape
-)
+/** Keep TV Material's outer ClassicCard border off so only [MatrixArtwork]'s glow rim frames focus. */
+internal fun focusedCardBorder(): Border = Border.None
 
 internal fun cardTitleColor(focused: Boolean, onSurface: Color, onSurfaceVariant: Color): Color =
     if (focused) onSurface else onSurfaceVariant
@@ -165,7 +162,7 @@ internal object MatrixCardDefaults {
     @Composable
     fun border() = CardDefaults.border(
         border = Border.None,
-        focusedBorder = focusedCardBorder(MaterialTheme.colorScheme.onSurface),
+        focusedBorder = focusedCardBorder(),
         pressedBorder = Border.None
     )
     @Composable
@@ -252,8 +249,8 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
     val density = androidx.compose.ui.platform.LocalDensity.current
     val (imageWidth, imageHeight) = remember(density, artworkWidth, card.portrait) {
         with(density) {
-            val w = artworkWidth.roundToPx()
-            val h = (w * if (card.portrait) 1.5f else 9f / 16f).toInt()
+            val w = artworkWidth.roundToPx().coerceAtLeast(1)
+            val h = (w * if (card.portrait) 1.5f else 9f / 16f).toInt().coerceAtLeast(1)
             w to h
         }
     }
@@ -264,7 +261,8 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
     val posterState = posterStateFor(card.image.isNotBlank(), posterOutcome)
     val context = LocalContext.current
     val request = remember(context, card.image, imageWidth, imageHeight) {
-        ImageRequest.Builder(context).data(card.image).size(imageWidth, imageHeight).crossfade(false).allowRgb565(true).build()
+        if (card.image.isBlank()) null
+        else ImageRequest.Builder(context).data(card.image).size(imageWidth, imageHeight).crossfade(false).allowRgb565(true).build()
     }
     ClassicCard(
         onClick = onClick, onLongClick = null,
@@ -275,9 +273,8 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
         scale = MatrixCardDefaults.scale(),
         image = {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Box(Modifier.width(artworkWidth)) {
-            MatrixArtwork(frameAspect, focused, sourceAspect) {
-                if (card.image.isNotBlank()) AsyncImage(
+            MatrixArtwork(frameAspect, focused, Modifier.width(artworkWidth), sourceAspect) {
+                if (request != null) AsyncImage(
                     model = request,
                     contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize(),
                     onLoading = { posterOutcome = PosterOutcome.Loading },
@@ -302,7 +299,7 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
                         card.metadata.contains("Upcoming", ignoreCase = true) ||
                             card.metadata.trim().let { m ->
                                 val y = m.filter(Char::isDigit).take(4).toIntOrNull()
-                                y != null && y >= java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                                y != null && y >= currentYear
                             }
                     )
                 }
@@ -341,7 +338,6 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
                 }
             }
             }
-            }
         },
         title = { Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
             Text(card.title, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
@@ -363,24 +359,22 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
 private fun PosterStateMark(state: PosterState, modifier: Modifier = Modifier) {
     val isError = state == PosterState.Error
     val colorScheme = MaterialTheme.colorScheme
+    val surfaceColor = colorScheme.surface
     val glyphColor = colorScheme.onSurface.copy(alpha = if (isError) 0.60f else 0.30f)
-    Canvas(modifier) {
-        if (!isError) drawRect(colorScheme.surface)
-
+    Spacer(modifier.drawWithCache {
         val extent = size.minDimension
         val frame = Size(extent * 0.46f, extent * 0.36f)
-        val origin = center - Offset(frame.width / 2, frame.height / 2)
+        val origin = Offset((size.width - frame.width) / 2f, (size.height - frame.height) / 2f)
         val stroke = 2.dp.toPx()
+        val errorStroke = 2.5.dp.toPx()
         fun framePoint(x: Float, y: Float) = origin + Offset(frame.width * x, frame.height * y)
-
-        drawRoundRect(
-            color = glyphColor,
-            topLeft = origin,
-            size = frame,
-            cornerRadius = CornerRadius(extent * 0.035f),
-            style = Stroke(stroke)
-        )
-        drawCircle(glyphColor, radius = extent * 0.035f, center = framePoint(0.24f, 0.26f))
+        val corner = CornerRadius(extent * 0.035f)
+        val dotCenter = framePoint(0.24f, 0.26f)
+        val dotRadius = extent * 0.035f
+        val rectStroke = Stroke(stroke)
+        val mountainStroke = Stroke(stroke, cap = StrokeCap.Round)
+        val slashStart = framePoint(-0.10f, 1.10f)
+        val slashEnd = framePoint(1.10f, -0.10f)
         val mountain = Path().apply {
             val start = framePoint(0.12f, 0.88f)
             val peak = framePoint(0.58f, 0.43f)
@@ -389,17 +383,28 @@ private fun PosterStateMark(state: PosterState, modifier: Modifier = Modifier) {
             lineTo(peak.x, peak.y)
             lineTo(end.x, end.y)
         }
-        drawPath(mountain, glyphColor, style = Stroke(stroke, cap = StrokeCap.Round))
-        if (isError) {
-            drawLine(
-                glyphColor,
-                start = framePoint(-0.10f, 1.10f),
-                end = framePoint(1.10f, -0.10f),
-                strokeWidth = 2.5.dp.toPx(),
-                cap = StrokeCap.Round
+        onDrawBehind {
+            if (!isError) drawRect(surfaceColor)
+            drawRoundRect(
+                color = glyphColor,
+                topLeft = origin,
+                size = frame,
+                cornerRadius = corner,
+                style = rectStroke
             )
+            drawCircle(glyphColor, radius = dotRadius, center = dotCenter)
+            drawPath(mountain, glyphColor, style = mountainStroke)
+            if (isError) {
+                drawLine(
+                    glyphColor,
+                    start = slashStart,
+                    end = slashEnd,
+                    strokeWidth = errorStroke,
+                    cap = StrokeCap.Round
+                )
+            }
         }
-    }
+    })
 }
 
 /** A quiet translucent track keeps the artwork visible without a second outline. */
@@ -417,15 +422,18 @@ private fun MatrixPlaybackProgress(progress: Float, modifier: Modifier = Modifie
 
 /** Keep layout stable, but fit the decorated surface to the decoded image itself. */
 @Composable
-private fun MatrixArtwork(ratio: Float, focused: Boolean, sourceAspect: Float = ratio, palette: ArtworkPalette? = null, content: @Composable BoxScope.() -> Unit) {
+private fun MatrixArtwork(ratio: Float, focused: Boolean, modifier: Modifier = Modifier, sourceAspect: Float = ratio,
+                          palette: ArtworkPalette? = null, content: @Composable BoxScope.() -> Unit) {
     val shape = MatrixCardDefaults.artworkShape
     val outline = animateFloatAsState(if (focused) 1f else 0f, tween(MatrixLayout.focusFadeMillis, easing = FastOutSlowInEasing), label = "artwork focus")
     val rotation = rememberMatrixFocusRotation(focused, LocalMatrixCapabilities.current.animations)
-    val color = MaterialTheme.colorScheme.onSurface
-    // App cards use their own cached accent; focused media uses the existing sampled palette.
-    val glowPalette = palette ?: (if (focused) MatrixAppearance.palette else null) ?: ArtworkPalette.app(color.toArgb())
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val fallbackPalette = remember(onSurface) { ArtworkPalette.app(onSurface.toArgb()) }
+    val borderHolder = remember { MatrixGlassBorderHolder() }
+    // Keep glow/rim drawing in separate leaf Spacers so 12 s sweep frames never re-record child artwork/badges,
+    // and sample MatrixAppearance.palette in the draw phase so palette updates do not recompose cards.
     // Fit during measurement, not subcomposition: every recycled card uses this hot path.
-    Box(Modifier.fillMaxWidth().aspectRatio(ratio)
+    Box(modifier.fillMaxWidth().aspectRatio(ratio)
             .layout { measurable, constraints ->
                 val width = constraints.maxWidth
                 val height = constraints.maxHeight
@@ -434,36 +442,31 @@ private fun MatrixArtwork(ratio: Float, focused: Boolean, sourceAspect: Float = 
                 val artwork = measurable.measure(Constraints.fixed(
                     bounds.width.roundToInt().coerceIn(0, width), bounds.height.roundToInt().coerceIn(0, height)))
                 layout(width, height) { artwork.placeRelative((width - artwork.width) / 2, (height - artwork.height) / 2) }
-            }
-            .drawWithCache {
-                val offset = MatrixLayout.focusOutlineOffset.toPx()
-                val radius = MatrixLayout.cardCorner.toPx() + offset
-                val stroke = MatrixLayout.focusOutlineWidth.toPx()
-                val spread = MatrixLayout.focusHaloSpread.toPx()
-                val origin = Offset(-offset, -offset)
-                val extent = Size(size.width + offset * 2, size.height + offset * 2)
-                var reflection: MatrixGlassBorder? = null
-                var lastPalette: ArtworkPalette? = null
-                onDrawWithContent {
-                    val alpha = outline.value
-                    if (alpha > 0f) {
-                        if (reflection == null || lastPalette != glowPalette) {
-                            lastPalette = glowPalette
-                            reflection = MatrixGlassBorder(android.graphics.RectF(origin.x, origin.y,
-                                origin.x + extent.width, origin.y + extent.height), radius, stroke, glowPalette, spread)
-                        }
-                        drawIntoCanvas { reflection?.drawGlow(it.nativeCanvas, rotation.value, alpha) }
-                    }
-                    drawContent()
-                    if (alpha > 0f) {
-                        drawIntoCanvas { reflection?.draw(it.nativeCanvas, rotation.value, alpha) }
-                    }
-                }
             }, contentAlignment = Alignment.Center) {
-            Box(Modifier.fillMaxSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center, content = content)
+        Spacer(Modifier.matchParentSize().drawBehind {
+            val alpha = outline.value
+            if (alpha <= 0f) return@drawBehind
+            val offset = MatrixLayout.focusOutlineOffset.toPx()
+            val glowPalette = palette ?: (if (focused) MatrixAppearance.palette else null) ?: fallbackPalette
+            borderHolder.resolve(size.width, size.height, offset, MatrixLayout.cardCorner.toPx() + offset,
+                MatrixLayout.focusOutlineWidth.toPx(), MatrixLayout.focusHaloSpread.toPx(), glowPalette)
+                ?.let { reflection -> drawIntoCanvas { reflection.drawGlow(it.nativeCanvas, rotation.value, alpha) } }
+        })
+        Box(Modifier.fillMaxSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center, content = content)
+        Spacer(Modifier.matchParentSize().drawBehind {
+            val alpha = outline.value
+            if (alpha <= 0f) return@drawBehind
+            val offset = MatrixLayout.focusOutlineOffset.toPx()
+            val glowPalette = palette ?: (if (focused) MatrixAppearance.palette else null) ?: fallbackPalette
+            borderHolder.resolve(size.width, size.height, offset, MatrixLayout.cardCorner.toPx() + offset,
+                MatrixLayout.focusOutlineWidth.toPx(), MatrixLayout.focusHaloSpread.toPx(), glowPalette)
+                ?.let { reflection -> drawIntoCanvas { reflection.draw(it.nativeCanvas, rotation.value, alpha) } }
+        })
     }
 }
+
+private val currentYear: Int by lazy { java.time.Year.now().value }
 
 private val RATING_IMDB_REGEX = Regex("""IMDb[:\s]+([\d.]+)""", RegexOption.IGNORE_CASE)
 private val RATING_TMDB_REGEX = Regex("""TMDB[:\s]+([\d.]+)""", RegexOption.IGNORE_CASE)

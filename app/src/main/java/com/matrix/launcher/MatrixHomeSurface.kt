@@ -141,7 +141,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
             if (deferred) inspection?.deferredRepeats = (inspection?.deferredRepeats ?: 0) + 1
             deferred
         }, contentPadding = PaddingValues(vertical = 34.dp)) {
-            item(key = "header") {
+            item(key = "header", contentType = "header") {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 48.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column { Text("WELCOME HOME", style = MaterialTheme.typography.labelLarge)
                         Text(clock.format(timeFormat), style = MaterialTheme.typography.displayMedium)
@@ -172,12 +172,12 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                     inspection?.homeCard = 0
                 }
             }
-            item(key = "favorites-title") {
+            item(key = "favorites-title", contentType = "favorites-title") {
                 Column(Modifier.padding(horizontal = 55.dp)) { Text("FAVORITES · HOLD OK TO EDIT", style = MaterialTheme.typography.labelMedium)
                     Text(title, style = MaterialTheme.typography.headlineLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 6.dp, bottom = 20.dp)) }
             }
-            item(key = "favorites") {
+            item(key = "favorites", contentType = "favorites") {
                 val favTargetId = if (focusedFavId != null && (favorites.any { it.id == focusedFavId } || focusedFavId == "edit-favorites")) {
                     focusedFavId!!
                 } else {
@@ -221,7 +221,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                     }
                 }
             }
-            if (contentRows.isEmpty()) item(key = "status") { Text(snapshot.status, Modifier.padding(48.dp), style = MaterialTheme.typography.bodyMedium) }
+            if (contentRows.isEmpty()) item(key = "status", contentType = "status") { Text(snapshot.status, Modifier.padding(48.dp), style = MaterialTheme.typography.bodyMedium) }
             itemsIndexed(contentRows, key = { _, row -> row.id }, contentType = { _, _ -> "channel" }) { rowIndex, row ->
                 MatrixChannelRow(row, mediaWidth, availableWidth, mediaColumns, "channel-${rowIndex + 1}", backRow, backToken,
                     isLastRow = rowIndex == contentRows.lastIndex,

@@ -1,19 +1,20 @@
 ## ADDED Requirements
 
-### Requirement: Focused cards have a solid theme-driven outline and a brighter title
+### Requirement: Focused cards rely on the artwork glow rim and brighter title without a second outer border
 
-In addition to the existing glow and scale, a focused media/app card
-SHALL show a solid focus outline (2dp, theme `onSurface` ring, using
-the existing `MatrixLayout.focusOutlineWidth` /
-`focusOutlineOffset` tokens) and its title SHALL brighten and bold.
-`MatrixCardDefaults.border()` SHALL NOT return Border.None for the
-focused state.
+Focused media/app cards SHALL keep TV Material's outer `ClassicCard`
+border at `Border.None` (`MatrixCardDefaults.border()`), relying on the
+fitted `MatrixGlassBorder` artwork glow/rim, focus scale, and brightened
+bold/medium card title (`cardTitleColor` / `cardTitleWeight`) instead of
+adding a redundant white outer rectangular border around the whole card.
 
-#### Scenario: Focus on a bright poster
-- **Given** a card whose artwork is bright
+#### Scenario: Focus on a card
+- **Given** a media or app card
 - **When** it receives D-pad focus
-- **Then** the solid outline and the brightened/bold title are visible
-  against the artwork, independent of the glow.
+- **Then** `MatrixCardDefaults.border()` uses `Border.None` for the outer
+  `ClassicCard` container so no duplicate white outer border draws outside
+  the glowing artwork rim, and the card title brightens and gains
+  medium weight.
 
 ### Requirement: Posters distinguish loading from broken
 

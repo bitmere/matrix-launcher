@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
@@ -57,6 +56,7 @@ internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus:
     var focusedCommand by remember { mutableStateOf<NowPlayingCommand?>(null) }
     val cardFocus = remember { FocusRequester() }
     val rotation = rememberMatrixFocusRotation(focused, LocalMatrixCapabilities.current.animations)
+    val borderHolder = remember { MatrixGlassBorderHolder() }
     val radius = MatrixLayout.panelCorner
     val spread = MatrixLayout.focusHaloSpread
     val playing = session.status == NowPlayingStatus.Playing
@@ -71,17 +71,12 @@ internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus:
         .onFocusChanged { focused = it.hasFocus; if (it.hasFocus) onFocus() }
         .focusProperties { onExit = {
             if (requestedFocusDirection == FocusDirection.Left || requestedFocusDirection == FocusDirection.Right) cancelFocusChange()
-        } }.focusGroup()
-        .drawWithCache {
-            val border = MatrixGlassBorder(android.graphics.RectF(0f, 0f, size.width, size.height),
-                radius.toPx(), .75.dp.toPx(), palette, spread.toPx())
-            onDrawWithContent {
-                if (focused) drawIntoCanvas { border.drawGlow(it.nativeCanvas, rotation.value) }
-                drawContent()
-                // The new card has a coloured rim, without changing shared card focus borders.
-                if (focused) drawIntoCanvas { border.draw(it.nativeCanvas, rotation.value) }
-            }
-        }) {
+        } }.focusGroup()) {
+        Spacer(Modifier.matchParentSize().drawBehind {
+            if (!focused) return@drawBehind
+            borderHolder.resolve(size.width, size.height, 0f, radius.toPx(), .75.dp.toPx(), spread.toPx(), palette)
+                ?.let { border -> drawIntoCanvas { border.drawGlow(it.nativeCanvas, rotation.value) } }
+        })
         Box(Modifier.matchParentSize().clip(shape)) {
             NowPlayingFrost(wallpaper, Modifier.matchParentSize())
             Box(Modifier.matchParentSize().background(MaterialTheme.colorScheme.surface.copy(alpha = .72f)))
@@ -125,6 +120,11 @@ internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus:
                 stringResource(R.string.now_playing_next), { command(NowPlayingCommand.Next) },
                 Modifier.onFocusChanged { if (it.isFocused) focusedCommand = NowPlayingCommand.Next })
         }
+        Spacer(Modifier.matchParentSize().drawBehind {
+            if (!focused) return@drawBehind
+            borderHolder.resolve(size.width, size.height, 0f, radius.toPx(), .75.dp.toPx(), spread.toPx(), palette)
+                ?.let { border -> drawIntoCanvas { border.draw(it.nativeCanvas, rotation.value) } }
+        })
     }
     LaunchedEffect(session.commands, session.toggle) {
         val control = focusedCommand
