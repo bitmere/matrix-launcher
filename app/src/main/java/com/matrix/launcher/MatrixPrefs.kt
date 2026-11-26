@@ -18,6 +18,7 @@ internal object MatrixPrefs {
     // Home rows / favorites
     const val FAVORITES = "favorites"
     const val SOURCES = "sources"
+    const val NOW_PLAYING_ROW = "matrix:now-playing"
     const val HIDDEN_ROWS = "hidden_rows"
     const val ROW_ORDER = "row_order"
     const val LIST_COLUMNS = "list_columns"

@@ -69,6 +69,15 @@ internal class ComposeHomeRepository(private val context: Context) {
         }
         HomeSnapshot(apps, favorites, HomeRows.visible(result, prefs).map(::row), HomeRows.orderedRows(result, prefs).map(::row), result.status)
     } }
+    fun withNowPlaying(snapshot: HomeSnapshot, item: NowPlayingItem? = NowPlayingMedia.state.value): HomeSnapshot {
+        val content = snapshot.rows.filterNot { it.id == MatrixPrefs.NOW_PLAYING_ROW }
+        val shown = MatrixPrefs.NOW_PLAYING_ROW !in prefs.getStringSet(MatrixPrefs.HIDDEN_ROWS, emptySet()).orEmpty()
+        val row = item?.takeIf { shown }?.let {
+            MediaRow(MatrixPrefs.NOW_PLAYING_ROW, context.getString(R.string.now_playing_title), emptyList(), it)
+        }
+        return snapshot.copy(rows = listOfNotNull(row) + content)
+    }
+
     private fun row(value: TvFeed.Row) = MediaRow(value.key, value.title, value.items.map {
         MediaCard(it.pkg + ":" + it.intent, it.title.orEmpty(), it.poster.orEmpty(), it.intent.orEmpty(),
             it.pkg.orEmpty(), it.portrait, it.position, it.duration, simklReference = it.simklReference.orEmpty())

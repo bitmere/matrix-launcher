@@ -104,6 +104,15 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
             scope.launch { list.scrollToItem(0); dockState.scrollToItem(0); withFrameNanos { }; initialFocus.requestFocus() }
         }
     }
+    val nowPlaying = snapshot.rows.firstOrNull { it.id == MatrixPrefs.NOW_PLAYING_ROW }?.nowPlaying
+    val contentRows = snapshot.rows.filterNot { it.id == MatrixPrefs.NOW_PLAYING_ROW }
+    LaunchedEffect(nowPlaying != null) {
+        if (nowPlaying == null && focusedRow == MatrixPrefs.NOW_PLAYING_ROW && active) {
+            list.scrollToItem(0)
+            withFrameNanos { }
+            initialFocus.requestFocus()
+        }
+    }
     val columns = HomeCardSizing.dockColumns(favorites.size)
     val mediaColumns = HomeCardSizing.contentColumns(MatrixSafeMode.effectiveColumns(repository.prefs, repository.safeMode))
     MatrixBackdropSurface(artworkBackdrop = wallpaper == null) {
@@ -155,6 +164,14 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                 }
                 Spacer(Modifier.height(100.dp))
             }
+            if (nowPlaying != null) item(key = MatrixPrefs.NOW_PLAYING_ROW, contentType = "now-playing") {
+                NowPlayingCard(nowPlaying, wallpaper, focusedRow == MatrixPrefs.NOW_PLAYING_ROW) {
+                    focusedRow = MatrixPrefs.NOW_PLAYING_ROW
+                    focusedCard.index = 0
+                    inspection?.homeRow = -2
+                    inspection?.homeCard = 0
+                }
+            }
             item(key = "favorites-title") {
                 Column(Modifier.padding(horizontal = 55.dp)) { Text("FAVORITES · HOLD OK TO EDIT", style = MaterialTheme.typography.labelMedium)
                     Text(title, style = MaterialTheme.typography.headlineLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -171,7 +188,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                     MatrixFocusRow(dockState, MatrixLayout.dockInset, dockWidth, "favorites", availableWidth = availableWidth - 46.dp * 2,
                         columns = columns, verticalInset = MatrixLayout.dockInset,
                         fallback = favRetained,
-                        isLastRow = snapshot.rows.isEmpty()) { slotWidth ->
+                        isLastRow = contentRows.isEmpty()) { slotWidth ->
                         itemsIndexed(favorites, key = { _, app -> app.id }, contentType = { _, _ -> "app" }) { index, app ->
                             val isTarget = app.id == favTargetId
                             MatrixAppCard(app, repository, slotWidth,
@@ -204,10 +221,10 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                     }
                 }
             }
-            if (snapshot.rows.isEmpty()) item(key = "status") { Text(snapshot.status, Modifier.padding(48.dp), style = MaterialTheme.typography.bodyMedium) }
-            itemsIndexed(snapshot.rows, key = { _, row -> row.id }, contentType = { _, _ -> "channel" }) { rowIndex, row ->
+            if (contentRows.isEmpty()) item(key = "status") { Text(snapshot.status, Modifier.padding(48.dp), style = MaterialTheme.typography.bodyMedium) }
+            itemsIndexed(contentRows, key = { _, row -> row.id }, contentType = { _, _ -> "channel" }) { rowIndex, row ->
                 MatrixChannelRow(row, mediaWidth, availableWidth, mediaColumns, "channel-${rowIndex + 1}", backRow, backToken,
-                    isLastRow = rowIndex == snapshot.rows.lastIndex,
+                    isLastRow = rowIndex == contentRows.lastIndex,
                     onFocus = { index, card -> focusedRow = row.id; focusedCard.index = index; inspection?.homeRow = rowIndex + 1; inspection?.homeCard = index; focusArtwork(card.image) },
                     click = mediaClick, hold = { mediaHold(row, it) }, backHandled = { backRow = "" })
 

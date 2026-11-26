@@ -1,0 +1,10 @@
+<resources>
+    <string name="now_playing_title">Now playing</string>
+    <string name="now_playing_playing">Playing</string>
+    <string name="now_playing_paused">Paused</string>
+    <string name="now_playing_play">Play</string>
+    <string name="now_playing_pause">Pause</string>
+    <string name="now_playing_previous">Previous</string>
+    <string name="now_playing_next">Next</string>
+    <string name="now_playing_settings_detail">Show playing or paused media at the top of Home. Requires Matrix notification access in TV Settings → Apps → Special app access → Notification access.</string>
+</resources>

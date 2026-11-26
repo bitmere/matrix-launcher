@@ -13,7 +13,7 @@ internal data class MediaCard(val id: String, val title: String, val image: Stri
     val mediaType: String = "", val summary: String = "", val simklReference: String = "")
 
 @Immutable
-internal data class MediaRow(val id: String, val title: String, val cards: List<MediaCard>)
+internal data class MediaRow(val id: String, val title: String, val cards: List<MediaCard>, val nowPlaying: NowPlayingItem? = null)
 
 @Immutable
 internal data class HomeSnapshot(val apps: List<LaunchApp> = emptyList(), val favorites: List<String> = emptyList(),
