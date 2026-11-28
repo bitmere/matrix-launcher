@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.16 — stable
+
+- TV document fallback: Backup, theme import, and the wallpaper picker no longer crash on TVs with no file-picker app (e.g. old TCL) — document launches are now guarded, so Matrix checks a picker exists first and shows a clear notice instead of failing with "there is no app that can do this".
+- Wallpapers: new "Choose image" picker entry, and permission / empty-index / query-failure states are now reported separately with the correct label ("Storage" on Android 12 and older).
+- Backup: new "Save on this TV" / "Restore from this TV" actions that need no picker at all, with a note that the file is removed if Matrix is uninstalled.
+- Tests: 335 JVM tests, all passing; lint 0 errors.
+
 ## 2.7.15 — stable
 
 - Card focus border cleanup: removed the redundant solid white outer `ClassicCard` border (`Border.None`) so focused cards frame cleanly with the artwork's fitted `MatrixGlassBorder` glow rim, focus scale, and highlighted card title.
