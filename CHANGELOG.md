@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.17 — stable
+
+- Liquid glass Phase 1: whole-launcher iOS-style liquid glass with live backdrop blur — the floating header blurs scrolling posters (Haze 2.1.0), glass tokens with WCAG contrast gates, wallpaper-tinted frost, focus springs, and dialog blur-behind with an always-present fallback.
+- Toolchain migration: AGP 9.1.1, Gradle 9.3.1, compileSdk 37, Kotlin 2.4.21; targetSdk 34 and minSdk 26 unchanged.
+- Notes: live blur needs Android 13+ (API 33); Android 12 and older, and 4K displays, stay on static frost. Now Playing loses its blue outline when unfocused; focus glow preserved.
+- Tests: 360 JVM tests, all passing; lint 0 errors.
+
 ## 2.7.16 — stable
 
 - TV document fallback: Backup, theme import, and the wallpaper picker no longer crash on TVs with no file-picker app (e.g. old TCL) — document launches are now guarded, so Matrix checks a picker exists first and shows a clear notice instead of failing with "there is no app that can do this".
