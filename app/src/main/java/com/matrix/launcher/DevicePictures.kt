@@ -15,6 +15,8 @@ internal data class DevicePicture(val uri: String, val name: String, val albumId
 
 /** Read-only, bounded MediaStore access. Never enumerates arbitrary filesystem paths. */
 internal object DevicePictures {
+    fun permissionLabel(): String = if (Build.VERSION.SDK_INT <= 32) "Storage" else "Photos and videos"
+
     fun permissions(): Array<String> = when {
         Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
         Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
@@ -26,7 +28,7 @@ internal object DevicePictures {
     }
 
     suspend fun read(context: Context): List<DevicePicture> = withContext(Dispatchers.IO) {
-        if (!allowed(context)) return@withContext emptyList()
+        if (!allowed(context)) throw SecurityException("Image access is off")
         val source = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val columns = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.BUCKET_ID, MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
@@ -39,7 +41,7 @@ internal object DevicePictures {
                 pictures += DevicePicture(ContentUris.withAppendedId(source, cursor.getLong(0)).toString(),
                     cursor.getString(1) ?: "Picture", cursor.getString(2) ?: "unknown", cursor.getString(3) ?: "Pictures")
             }
-        }
+        } ?: throw IllegalStateException("Image index is unavailable")
         pictures
     }
 }

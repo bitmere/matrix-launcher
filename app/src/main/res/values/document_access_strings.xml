@@ -1,0 +1,18 @@
+<resources>
+    <string name="document_picker_unavailable">This TV has no file picker. For backups, use Save on this TV or Restore from this TV. For pictures, browse TV pictures or share an image into Matrix.</string>
+    <string name="document_picker_denied">This TV blocked the file picker. Try a local backup, or check the picker in TV settings.</string>
+    <string name="document_picker_busy">A file picker is already open. Finish or cancel it first.</string>
+    <string name="backup_local_save">Save on this TV</string>
+    <string name="backup_local_restore">Restore from this TV</string>
+    <string name="backup_local_durability">Removed if Matrix is uninstalled; copy this file elsewhere to keep it.</string>
+    <string name="backup_local_saving">Saving local backup…</string>
+    <string name="backup_local_loading">Loading local backups…</string>
+    <string name="backup_local_saved">Backup saved</string>
+    <string name="backup_local_failed">Could not save backup. Check free space and storage availability, then try again.</string>
+    <string name="backup_local_list_failed">Could not read local backups. Check storage availability and try again.</string>
+    <string name="backup_local_empty">No local backups yet. Choose Save on this TV first.</string>
+    <string name="backup_local_list">Choose a backup below. Up to 32 local JSON files are shown.</string>
+    <string name="backup_local_restoring">Restoring backup…</string>
+    <string name="wallpaper_choose_image">Choose image</string>
+    <string name="wallpaper_choose_detail">Use a file picker without granting gallery access. The image is copied into Matrix.</string>
+</resources>

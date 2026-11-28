@@ -175,6 +175,22 @@ internal object MatrixBackup {
  * them), so MatrixHomeScreen.kt needs no change to wire them.
  */
 internal object MatrixSaf {
+    fun open(types: Array<String>, result: (Uri?) -> Unit): DocumentLaunch =
+        openDocument?.invoke(types, result) ?: DocumentLaunch.UNAVAILABLE
+
+    fun create(name: String, mime: String, result: (Uri?) -> Unit): DocumentLaunch =
+        createDocument?.invoke(name, mime, result) ?: DocumentLaunch.UNAVAILABLE
+
+    fun notice(context: Context, outcome: DocumentLaunch, show: (String) -> Unit) {
+        val resource = when (outcome) {
+            DocumentLaunch.STARTED -> return
+            DocumentLaunch.UNAVAILABLE -> R.string.document_picker_unavailable
+            DocumentLaunch.DENIED -> R.string.document_picker_denied
+            DocumentLaunch.BUSY -> R.string.document_picker_busy
+        }
+        show(context.getString(resource))
+    }
+
     fun release(activity: Any) {
         if (owner !== activity) return
         cancelPending?.invoke()
@@ -186,6 +202,6 @@ internal object MatrixSaf {
 
     var owner: Any? = null
     var cancelPending: (() -> Unit)? = null
-    var openDocument: ((mimeTypes: Array<String>, onResult: (Uri?) -> Unit) -> Unit)? = null
-    var createDocument: ((fileName: String, mimeType: String, onResult: (Uri?) -> Unit) -> Unit)? = null
+    var openDocument: ((mimeTypes: Array<String>, onResult: (Uri?) -> Unit) -> DocumentLaunch)? = null
+    var createDocument: ((fileName: String, mimeType: String, onResult: (Uri?) -> Unit) -> DocumentLaunch)? = null
 }

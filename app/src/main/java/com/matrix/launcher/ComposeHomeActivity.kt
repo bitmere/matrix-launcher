@@ -89,14 +89,27 @@ class ComposeHomeActivity : ComponentActivity() {
     // Storage Access Framework launchers for backup export/import and theme
     // import. The pending callback is set by the settings page that asked;
     // the result is delivered once and then cleared.
-    private var documentResult: ((android.net.Uri?) -> Unit)? = null
-    private val openDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        documentResult?.invoke(uri); documentResult = null
+    private val documentResult = PendingDocument<android.net.Uri>()
+    private val openDocument = registerForActivityResult(object : ActivityResultContracts.OpenDocument() {
+        override fun createIntent(context: android.content.Context, input: Array<String>): Intent =
+            super.createIntent(context, input).addCategory(Intent.CATEGORY_OPENABLE)
+    }) { uri ->
+        documentResult.complete(uri)
     }
     private val createDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument(MatrixBackup.MIME_TYPE)) { uri ->
-        documentResult?.invoke(uri); documentResult = null
+        documentResult.complete(uri)
     }
+    private fun <I> launchDocument(launcher: androidx.activity.result.ActivityResultLauncher<I>,
+        input: I, onResult: (android.net.Uri?) -> Unit): DocumentLaunch =
+        documentResult.launch(onResult, resolve = {
+            val intent = launcher.contract.createIntent(this, input)
+            packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.let { it.enabled && it.applicationInfo.enabled } == true
+        }, missingHandler = { it is android.content.ActivityNotFoundException }) {
+            launcher.launch(input)
+        }
+
     private fun requestListings() {
         if (listingsAllowed) return
         val requested = repository.prefs.getBoolean("listings_permission_requested", false)
@@ -179,9 +192,12 @@ class ComposeHomeActivity : ComponentActivity() {
         }
         // Wire the SAF launchers for the settings pages (backup + theme import).
         MatrixSaf.owner = this
-        MatrixSaf.cancelPending = { documentResult = null }
-        MatrixSaf.openDocument = { mimeTypes, onResult -> documentResult = onResult; openDocument.launch(mimeTypes) }
-        MatrixSaf.createDocument = { fileName, _, onResult -> documentResult = onResult; createDocument.launch(fileName) }
+        MatrixSaf.cancelPending = { documentResult.cancel() }
+        MatrixSaf.openDocument = { mimeTypes, onResult -> launchDocument(openDocument, mimeTypes, onResult) }
+        MatrixSaf.createDocument = { fileName, mimeType, onResult ->
+            require(mimeType == MatrixBackup.MIME_TYPE)
+            launchDocument(createDocument, fileName, onResult)
+        }
         setContent {
             // A clean start reached composition: reset the crash counter.
             androidx.compose.runtime.SideEffect { MatrixSafeMode.onFirstComposition(repository.prefs) }
@@ -233,7 +249,7 @@ class ComposeHomeActivity : ComponentActivity() {
     }
     override fun onDestroy() {
         MatrixSaf.release(this)
-        documentResult = null
+        documentResult.cancel()
         noticeToast?.cancel(); remoteConfig.cancel(); unregisterReceiver(packages); repository.clear(); super.onDestroy()
     }
     private fun wallpaperChanged() {
