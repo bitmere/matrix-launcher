@@ -13,7 +13,7 @@ class AuditRegressionTest {
         var cancelled = false
         MatrixSaf.owner = current
         MatrixSaf.cancelPending = { cancelled = true }
-        MatrixSaf.openDocument = { _, _ -> }
+        MatrixSaf.openDocument = { _, _ -> DocumentLaunch.STARTED }
         MatrixSaf.release(old)
         assertFalse(cancelled)
         assertNotNull(MatrixSaf.openDocument)

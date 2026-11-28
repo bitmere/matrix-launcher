@@ -72,9 +72,9 @@ internal class MatrixSettingsPageScope(
     },
     val recreate: () -> Unit = { (context as? android.app.Activity)?.recreate() },
     val openDocument: (mimeTypes: Array<String>, onResult: (android.net.Uri?) -> Unit) -> Unit =
-        { mimeTypes, onResult -> MatrixSaf.openDocument?.invoke(mimeTypes, onResult) },
+        { mimeTypes, onResult -> MatrixSaf.notice(context, MatrixSaf.open(mimeTypes, onResult), notice) },
     val createDocument: (fileName: String, mimeType: String, onResult: (android.net.Uri?) -> Unit) -> Unit =
-        { fileName, mimeType, onResult -> MatrixSaf.createDocument?.invoke(fileName, mimeType, onResult) }
+        { fileName, mimeType, onResult -> MatrixSaf.notice(context, MatrixSaf.create(fileName, mimeType, onResult), notice) }
 )
 
 /** What a registry page renders: a [SettingsPage] action list or a [MatrixMenu]. */
@@ -431,6 +431,11 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
         val hasTheme by produceState(false, scope.context) {
             value = withContext(Dispatchers.IO) { MatrixBackup.readThemeJson(scope.context.filesDir) != null }
         }
+        var localFiles by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
+        var localStatus by remember { mutableStateOf("") }
+        var localPath by remember { mutableStateOf("") }
+        var localBusy by remember { mutableStateOf(false) }
+        fun backupFiles() = MatrixBackupFiles(scope.context.getExternalFilesDir(null), scope.context.filesDir)
         SettingsPageContent.Actions(listOf(
             SettingAction(stringResource(R.string.settings_backup_contents_title),
                 pluralStringResource(R.plurals.settings_backup_contents_detail, exportable.size, exportable.size,
@@ -445,7 +450,9 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
                         val ok = runCatching {
                             val json = MatrixBackup.encode(exportable, MatrixBackup.readThemeJson(scope.context.filesDir))
                             scope.context.contentResolver.openOutputStream(uri)?.use {
-                                it.write(json.toByteArray(Charsets.UTF_8))
+                                val bytes = json.toByteArray(Charsets.UTF_8)
+                                require(bytes.size <= MatrixBackup.MAX_BYTES)
+                                it.write(bytes)
                             } ?: throw IllegalStateException("No output stream")
                         }.isSuccess
                         withContext(Dispatchers.Main) {
@@ -479,8 +486,73 @@ internal val matrixHomeSettingsPages: List<SettingsPageDef> = listOf(
                         }
                     }
                 }
+            },
+            SettingAction(stringResource(R.string.backup_local_save),
+                stringResource(R.string.backup_local_durability), role = MatrixControlRole.Action) {
+                if (!localBusy) {
+                    localBusy = true
+                    localStatus = scope.context.getString(R.string.backup_local_saving)
+                    ioScope.launch {
+                        try {
+                            val saved = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    backupFiles().save(MatrixBackup.encode(MatrixBackup.exportPrefs(prefs),
+                                        MatrixBackup.readThemeJson(scope.context.filesDir)))
+                                }
+                            }
+                            localPath = saved.getOrNull()?.absolutePath.orEmpty()
+                            localStatus = scope.context.getString(if (saved.isSuccess)
+                                R.string.backup_local_saved else R.string.backup_local_failed)
+                            scope.notice(localStatus)
+                        } finally { localBusy = false }
+                    }
+                }
+            },
+            SettingAction(stringResource(R.string.backup_local_restore),
+                stringResource(R.string.backup_local_list), role = MatrixControlRole.Action) {
+                if (!localBusy) {
+                    localBusy = true
+                    localStatus = scope.context.getString(R.string.backup_local_loading)
+                    ioScope.launch {
+                        try {
+                            val listed = withContext(Dispatchers.IO) { runCatching { backupFiles().list() } }
+                            localFiles = listed.getOrDefault(emptyList())
+                            localStatus = scope.context.getString(when {
+                                listed.isFailure -> R.string.backup_local_list_failed
+                                localFiles.isEmpty() -> R.string.backup_local_empty
+                                else -> R.string.backup_local_list
+                            })
+                        } finally { localBusy = false }
+                    }
+                }
             }
-        ))
+        ) + buildList {
+            if (localStatus.isNotEmpty()) add(SettingAction(localStatus, localPath, id = "local-backup-status", isStatus = true))
+            localFiles.forEach { file ->
+                add(SettingAction(file.name, file.absolutePath, id = file.absolutePath) {
+                    if (!localBusy) {
+                        localBusy = true
+                        localStatus = scope.context.getString(R.string.backup_local_restoring)
+                        ioScope.launch {
+                            try {
+                                val restored = withContext(Dispatchers.IO) {
+                                    runCatching { MatrixBackup.apply(scope.context, prefs, backupFiles().read(file)) }
+                                }
+                                val count = restored.getOrNull()
+                                if (count != null) {
+                                    scope.notice(scope.context.resources.getQuantityString(R.plurals.settings_backup_imported, count, count))
+                                    scope.recreate()
+                                } else {
+                                    localStatus = scope.context.getString(if (restored.exceptionOrNull() is BackupCommitException)
+                                        R.string.settings_backup_partial_failure else R.string.settings_backup_import_failed)
+                                    scope.notice(localStatus)
+                                }
+                            } finally { localBusy = false }
+                        }
+                    }
+                })
+            }
+        })
     }
 )
 

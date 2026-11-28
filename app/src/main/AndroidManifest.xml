@@ -20,6 +20,15 @@
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="yandex.tv.permission.ACCESS_TV_SOURCE" />
     <queries>
+        <!-- OpenDocument uses */* plus EXTRA_MIME_TYPES; match the contract. -->
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CREATE_DOCUMENT" />
+            <data android:mimeType="application/json" />
+        </intent>
         <package android:name="com.nuvio.tv" />
         <package android:name="com.stremio.one" />
         <intent>
