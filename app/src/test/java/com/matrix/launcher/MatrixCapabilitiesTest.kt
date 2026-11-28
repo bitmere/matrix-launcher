@@ -10,6 +10,13 @@ class MatrixCapabilitiesTest {
     @Test fun measuredModernGpuGetsFull() {
         assertEquals(MatrixCapabilities.FULL, MatrixCapabilities.decide(false, false, 31, measuredGpu = true))
     }
+    @Test fun measuredGpuGetsFullOnApi31And32() {
+        // Locks in the API 31/32 enablement: the GPU qualification may now
+        // produce measuredGpu on 31/32 (fence-less probe), so decide() must
+        // grant FULL there, not just on 33+.
+        assertEquals(MatrixCapabilities.FULL, MatrixCapabilities.decide(false, false, 31, measuredGpu = true))
+        assertEquals(MatrixCapabilities.FULL, MatrixCapabilities.decide(false, false, 32, measuredGpu = true))
+    }
     @Test fun cheapVariantWhenSafeMode() {
         assertEquals(MatrixCapabilities.CHEAP, MatrixCapabilities.decide(true, false, 31))
     }

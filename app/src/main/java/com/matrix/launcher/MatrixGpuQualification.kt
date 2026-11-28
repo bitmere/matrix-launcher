@@ -29,6 +29,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
 import java.time.Duration
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** No trial blur in a visible window. Collect normal frames, then probe only after Home stops.
@@ -58,9 +59,15 @@ internal class MatrixGpuQualification(
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
 
     init {
-        // Image fences are required for evidence of completed GPU work (API 33).
-        // API 31/32 stay STATIC rather than accepting submission time as GPU time.
-        if (eligible && Build.VERSION.SDK_INT >= 33 && width in 1..1920 && height in 1..1080 &&
+        // No public fence API before API 33, so on 31/32 the probe waits for GPU
+        // completion by touching the image planes instead: the native lock behind
+        // Image.getPlanes() consumes the buffer's acquire fence (ImageReader JNI
+        // passes the fence fd to lockImageFromBuffer), so the elapsed time below
+        // still includes GPU completion. API 31 is provisional: Haze recaptures
+        // blur input after any snapshot state change on API 31 only, and Home has
+        // a ticking clock plus the rotating orb, so that recapture cost is
+        // unmeasured; the revoke-on-bad-frame net bounds the risk.
+        if (eligible && Build.VERSION.SDK_INT >= 31 && width in 1..1920 && height in 1..1080 &&
             activity.getSystemService(ActivityManager::class.java).memoryClass >= 256) {
             thermalSafe = power.currentThermalStatus == PowerManager.THERMAL_STATUS_NONE
             owner.lifecycle.addObserver(this)
@@ -98,7 +105,15 @@ internal class MatrixGpuQualification(
                     addAction(Intent.ACTION_SCREEN_OFF)
                     addAction(Intent.ACTION_SCREEN_ON)
                 }
-                activity.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                // The 3-arg registerReceiver overload (with the NOT_EXPORTED flag)
+                // is API 33+. On 31/32 fall back to the 2-arg registration: these
+                // are system broadcasts (power-save, screen off/on) that no other
+                // app can send, so the missing flag changes nothing in practice.
+                if (Build.VERSION.SDK_INT >= 33) {
+                    activity.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    activity.registerReceiver(receiver, filter)
+                }
                 powerReceiver = receiver
             } catch (_: RuntimeException) { revoke() }
         }
@@ -110,7 +125,7 @@ internal class MatrixGpuQualification(
     private fun revoke() { evidence.fail(); attempted = true; probeJob?.cancel(); onResult(false) }
 
     override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-        if (Build.VERSION.SDK_INT < 33) return
+        if (Build.VERSION.SDK_INT < 31) return
         when (event) {
             Lifecycle.Event.ON_START -> {
                 foreground.set(true)
@@ -135,26 +150,34 @@ internal class MatrixGpuQualification(
         }
     }
 
-    @RequiresApi(33)
+    @RequiresApi(31)
     private fun tryProbe() {
         if (!foreground.get() && !power.isInteractive && !attempted && evidence.baselineReady && safeEnvironment()) {
             attempted = true
             probeJob = owner.lifecycleScope.launch {
+                // On API 31/32 the probe waits on the planes lock, which has no
+                // timeout: run it on a dedicated daemon thread so a wedged GPU
+                // cannot pin a shared pool thread. API 33+ keeps Dispatchers.Default.
+                val probeDispatcher = if (Build.VERSION.SDK_INT >= 33) Dispatchers.Default else
+                    Executors.newSingleThreadExecutor { runnable ->
+                        Thread(runnable, "MatrixGpuProbe31").apply { isDaemon = true }
+                    }.asCoroutineDispatcher()
                 try {
                     delay(1_000) // Screen must stay off; never compete with another visible app.
                     check(!power.isInteractive)
-                    val samples = withTimeout(4_000) { withContext(Dispatchers.Default) { measureBlur() } }
+                    val samples = withTimeout(4_000) { withContext(probeDispatcher) { measureBlur() } }
                     if (foreground.get() || power.isInteractive || !safeEnvironment()) { revoke(); return@launch }
                     samples.forEach { evidence.probe(it) }
                     onResult(evidence.qualified)
                 } catch (cancelled: CancellationException) { evidence.fail(); onResult(false); throw cancelled }
                 catch (_: Exception) { revoke() }
                 catch (_: OutOfMemoryError) { revoke() }
+                finally { (probeDispatcher as? ExecutorCoroutineDispatcher)?.close() }
             }
         }
     }
 
-    @RequiresApi(33)
+    @RequiresApi(31)
     private suspend fun measureBlur(): List<Long> {
         // Two full-display buffers, no Bitmap, pixel readback, decode, or source capture.
         // Full-display blur is intentionally much larger than the bounded header effect.
@@ -191,8 +214,18 @@ internal class MatrixGpuQualification(
                     image = reader.acquireLatestImage()
                 }
                 checkNotNull(image).use { output ->
-                    output.fence.use { fence ->
-                        check(fence.isValid && fence.await(Duration.ofMillis(4)))
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        output.fence.use { fence ->
+                            check(fence.isValid && fence.await(Duration.ofMillis(4)))
+                        }
+                    } else {
+                        // No public fence API before API 33. Touching the planes
+                        // waits on the buffer's acquire fence inside the native
+                        // lock, so the elapsed time below still includes GPU
+                        // completion. The lock has no timeout; tryProbe runs this
+                        // on a dedicated thread for API 31/32.
+                        val planeBuffer = output.planes[0].buffer
+                        check(planeBuffer.capacity() > 0)
                     }
                 }
                 val elapsed = System.nanoTime() - begin
