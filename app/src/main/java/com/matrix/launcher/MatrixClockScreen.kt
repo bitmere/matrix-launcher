@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -18,7 +19,6 @@ import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -26,7 +26,7 @@ import kotlinx.coroutines.isActive
 @Composable
 internal fun MatrixClockScreen() {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
-    val locale = Locale.getDefault()
+    val locale = LocalLocale.current.platformLocale
     val timeFormat = remember(locale) { DateTimeFormatter.ofPattern("h:mm", locale) }
     val dateFormat = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM", locale) }
     val context = LocalContext.current

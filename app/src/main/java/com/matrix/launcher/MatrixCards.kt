@@ -1,5 +1,6 @@
 package com.matrix.launcher
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -10,8 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
@@ -166,7 +167,7 @@ internal object MatrixCardDefaults {
         pressedBorder = Border.None
     )
     @Composable
-    fun scale() = CardDefaults.scale(focusedScale = MatrixLayout.cardFocusScale)
+    fun scale() = CardDefaults.scale(scale = 1f, focusedScale = 1f, pressedScale = 1f)
     @Composable
     fun colors() = CardDefaults.colors(
         containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface,
@@ -183,9 +184,11 @@ internal fun MatrixAppCard(app: LaunchApp, repository: ComposeHomeRepository, wi
     val palette = remember(art?.second, fallback) { ArtworkPalette.app(art?.second ?: fallback) }
     var focused by remember { mutableStateOf(false) }
     LaunchedEffect(art) { if (focused) onFocus(app.title, art?.second ?: fallback) }
+    val interaction = remember { MutableInteractionSource() }
     ClassicCard(
+        interactionSource = interaction,
         onClick = onClick, onLongClick = null,
-        modifier = modifier.tvCardClickable(onClick, onLongClick).width(width).then(if (!showTitle) Modifier.semantics { contentDescription = app.title } else Modifier).onFocusChanged {
+        modifier = modifier.matrixFocusScale(interaction).tvCardClickable(onClick, onLongClick).width(width).then(if (!showTitle) Modifier.semantics { contentDescription = app.title } else Modifier).onFocusChanged {
             focused = it.isFocused; if (it.isFocused) onFocus(app.title, art?.second ?: fallback)
         },
         colors = MatrixCardDefaults.colors(), shape = MatrixCardDefaults.shape(), border = MatrixCardDefaults.border(),
@@ -206,7 +209,8 @@ internal fun MatrixAppCard(app: LaunchApp, repository: ComposeHomeRepository, wi
 @Composable
 internal fun MatrixActionCard(title: String, icon: Int, width: Dp, click: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}) {
     var focused by remember { mutableStateOf(false) }
-    ClassicCard(onClick = click, modifier = modifier.width(width).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }, scale = MatrixCardDefaults.scale(),
+    val interaction = remember { MutableInteractionSource() }
+    ClassicCard(onClick = click, interactionSource = interaction, modifier = modifier.matrixFocusScale(interaction).width(width).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }, scale = MatrixCardDefaults.scale(),
         image = { MatrixArtwork(16f / 9f, focused) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(painterResource(icon), null, Modifier.size(40.dp))
@@ -264,9 +268,11 @@ internal fun MatrixMediaCard(card: MediaCard, width: Dp, onFocus: (String) -> Un
         if (card.image.isBlank()) null
         else ImageRequest.Builder(context).data(card.image).size(imageWidth, imageHeight).crossfade(false).allowRgb565(true).build()
     }
+    val interaction = remember { MutableInteractionSource() }
     ClassicCard(
+        interactionSource = interaction,
         onClick = onClick, onLongClick = null,
-        modifier = modifier.tvCardClickable(onClick, onLongClick).width(width).semantics {
+        modifier = modifier.matrixFocusScale(interaction).tvCardClickable(onClick, onLongClick).width(width).semantics {
             if (progress != null) stateDescription = "${(progress * 100).roundToInt()}% watched"
         }.onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus(card.id) },
         colors = MatrixCardDefaults.colors(), shape = MatrixCardDefaults.shape(), border = MatrixCardDefaults.border(),
@@ -425,7 +431,7 @@ private fun MatrixPlaybackProgress(progress: Float, modifier: Modifier = Modifie
 private fun MatrixArtwork(ratio: Float, focused: Boolean, modifier: Modifier = Modifier, sourceAspect: Float = ratio,
                           palette: ArtworkPalette? = null, content: @Composable BoxScope.() -> Unit) {
     val shape = MatrixCardDefaults.artworkShape
-    val outline = animateFloatAsState(if (focused) 1f else 0f, tween(MatrixLayout.focusFadeMillis, easing = FastOutSlowInEasing), label = "artwork focus")
+    val outline = animateFloatAsState(if (focused) 1f else 0f, if (LocalMatrixCapabilities.current.transitions) spring(stiffness = 700f, dampingRatio = 1f) else snap(), label = "artwork focus")
     val rotation = rememberMatrixFocusRotation(focused, LocalMatrixCapabilities.current.animations)
     val onSurface = MaterialTheme.colorScheme.onSurface
     val fallbackPalette = remember(onSurface) { ArtworkPalette.app(onSurface.toArgb()) }
@@ -444,7 +450,7 @@ private fun MatrixArtwork(ratio: Float, focused: Boolean, modifier: Modifier = M
                 layout(width, height) { artwork.placeRelative((width - artwork.width) / 2, (height - artwork.height) / 2) }
             }, contentAlignment = Alignment.Center) {
         Spacer(Modifier.matchParentSize().drawBehind {
-            val alpha = outline.value
+            val alpha = outline.value.coerceIn(0f, 1f)
             if (alpha <= 0f) return@drawBehind
             val offset = MatrixLayout.focusOutlineOffset.toPx()
             val glowPalette = palette ?: (if (focused) MatrixAppearance.palette else null) ?: fallbackPalette
@@ -455,7 +461,7 @@ private fun MatrixArtwork(ratio: Float, focused: Boolean, modifier: Modifier = M
         Box(Modifier.fillMaxSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center, content = content)
         Spacer(Modifier.matchParentSize().drawBehind {
-            val alpha = outline.value
+            val alpha = outline.value.coerceIn(0f, 1f)
             if (alpha <= 0f) return@drawBehind
             val offset = MatrixLayout.focusOutlineOffset.toPx()
             val glowPalette = palette ?: (if (focused) MatrixAppearance.palette else null) ?: fallbackPalette

@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
+import androidx.tv.material3.MaterialTheme
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
@@ -91,27 +94,90 @@ internal class MatrixBackdropState(val base: Int) {
     val fraction = Animatable(1f)
     var size by mutableStateOf(IntSize.Zero)
     var coordinates: LayoutCoordinates? = null
+    // Shared photo resources; coordinates remain local to this window for edge fades.
+    var glassSource: MatrixGlassSource? = null
+    var panelLocal: Boolean = false
+    var panelMaterial by mutableStateOf<MatrixGlass.Material?>(null)
+    var panelSolid by mutableStateOf(false)
+    private val panelPaint = Paint()
+    private var panelStops: List<androidx.compose.ui.graphics.Color>? = null
+    private var panelHeight = -1
+    var panelOffset by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
+    var panelWindowSize by mutableStateOf(IntSize.Zero)
+    private val windowInPanel = RectF()
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val rect = RectF()
     fun draw(canvas: Canvas) {
+        if (panelLocal) { drawPanel(canvas); return }
         val value = frame
-        if (value == null) { canvas.drawColor(base); return }
+        if (value == null) { canvas.drawColor(base); drawWallpaper(canvas); return }
         rect.set(0f, 0f, size.width.toFloat(), size.height.toFloat())
         paint.alpha = 255
         value.previous?.let { canvas.drawBitmap(it, null, rect, paint) }
         paint.alpha = if (value.previous == null) 255 else (255 * fraction.value).toInt().coerceIn(0, 255)
         canvas.drawBitmap(value.current, null, rect, paint)
+        drawWallpaper(canvas)
     }
+    private fun drawPanel(canvas: Canvas) {
+        val material = panelMaterial ?: return
+        rect.set(0f, 0f, size.width.toFloat(), size.height.toFloat())
+        if (panelSolid || glassSource?.blurred == null) canvas.drawColor(material.scrim.base)
+        else {
+            windowInPanel.set(-panelOffset.x, -panelOffset.y,
+                panelWindowSize.width - panelOffset.x, panelWindowSize.height - panelOffset.y)
+            glassSource?.drawFrost(canvas, windowInPanel)
+        }
+        if (panelStops != material.fillStops || panelHeight != size.height) {
+            panelStops = material.fillStops; panelHeight = size.height
+            panelPaint.shader = LinearGradient(0f, 0f, 0f, size.height.coerceAtLeast(1).toFloat(),
+                material.fillStops.map { it.toArgb() }.toIntArray(), null, Shader.TileMode.CLAMP)
+        }
+        canvas.drawRect(rect, panelPaint)
+    }
+    private fun drawWallpaper(canvas: Canvas) {
+        if (panelLocal) return
+        val source = glassSource ?: return
+        val bitmap = source.decoded ?: return
+        rect.set(0f, 0f, size.width.toFloat(), size.height.toFloat())
+        paint.alpha = 255
+        canvas.drawBitmap(bitmap, null, rect, paint)
+        val dim = source.key?.dim ?: GlassDim()
+        // Cached by source/configuration, not generated per frame.
+        if (dimHeight != size.height || dimValue != dim) {
+            dimHeight = size.height; dimValue = dim
+            dimPaint.shader = LinearGradient(0f, 0f, 0f, size.height.toFloat(),
+                intArrayOf((dim.top * 255).toInt() shl 24, (dim.middle * 255).toInt() shl 24,
+                    (dim.bottom * 255).toInt() shl 24), null, Shader.TileMode.CLAMP)
+        }
+        canvas.drawRect(rect, dimPaint)
+    }
+    private val dimPaint = Paint()
+    private var dimHeight = -1
+    private var dimValue: GlassDim? = null
 }
 internal val LocalMatrixBackdrop = staticCompositionLocalOf<MatrixBackdropState?> { null }
 
 @Composable
 internal fun MatrixBackdropSurface(modifier: Modifier = Modifier, panel: Boolean = false, artworkBackdrop: Boolean = true, content: @Composable BoxScope.() -> Unit) {
-    val base = colorResource(if (panel) R.color.home_panel else R.color.home_background).toArgb()
+    val cheap = LocalMatrixCapabilities.current.material == MatrixMaterialQuality.CHEAP
+    val base = colorResource(if (panel) R.color.home_panel else R.color.home_background).toArgb().let { if (cheap) it or 0xff000000.toInt() else it }
     val fallback = colorResource(R.color.home_surface).toArgb()
-    val palette = if (panel) ArtworkPalette.app(fallback) else if (artworkBackdrop) MatrixAppearance.palette ?: ArtworkPalette.app(fallback) else null
-    val state = remember(base) { MatrixBackdropState(base) }
-    LaunchedEffect(palette, state.size) {
+    val palette = if (cheap || panel) null else if (artworkBackdrop) MatrixAppearance.palette ?: ArtworkPalette.app(fallback) else null
+    val source = LocalMatrixGlassSource.current
+    val localState = remember(base) { MatrixBackdropState(base) }
+    // Menu/grid edge fades sample panel pixels, never activity coordinates across a Dialog window.
+    val state = if (panel) localState else source?.backdrop ?: localState
+    state.glassSource = source
+    state.panelLocal = panel
+    state.panelSolid = cheap
+    val analysis = source?.analysis ?: WallpaperAnalysis.Empty
+    val foreground = MaterialTheme.colorScheme.onSurface
+    state.panelMaterial = remember(panel, analysis, foreground) {
+        if (panel) MatrixGlass.material(MatrixGlass.Role.Panel, analysis, foreground) else null
+    }
+    val view = LocalView.current
+    val transitions = LocalMatrixCapabilities.current.transitions
+    LaunchedEffect(palette, state.size, transitions) {
         if (palette == null) { state.frame = null; state.fraction.snapTo(1f); return@LaunchedEffect }
         if (state.size == IntSize.Zero) return@LaunchedEffect
         delay(35)
@@ -126,10 +192,16 @@ internal fun MatrixBackdropSurface(modifier: Modifier = Modifier, panel: Boolean
         if (old?.current === target && progress >= .999f) return@LaunchedEffect
         state.fraction.snapTo(if (previous == null) 1f else 0f)
         state.frame = BackdropFrame(previous, target)
-        if (previous != null) state.fraction.animateTo(1f, tween(320))
+        if (previous != null && transitions) state.fraction.animateTo(1f, tween(320))
         state.frame = BackdropFrame(null, target)
     }
-    Box(modifier.fillMaxSize().onSizeChanged { state.size = it }.onGloballyPositioned { state.coordinates = it }
+    Box(modifier.fillMaxSize().onSizeChanged { state.size = it; if (!panel) source?.size = it }.onGloballyPositioned {
+            state.coordinates = it
+            if (panel) {
+                state.panelOffset = it.positionInWindow()
+                state.panelWindowSize = IntSize(view.rootView.width, view.rootView.height)
+            }
+        }
         .drawBehind { drawIntoCanvas { state.draw(it.nativeCanvas) } }) {
         CompositionLocalProvider(LocalMatrixBackdrop provides state) { content() }
     }

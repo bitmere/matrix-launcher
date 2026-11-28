@@ -3,28 +3,36 @@ package com.matrix.launcher
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 
-/**
- * Which effects Home may use. One decision point for old and new TVs:
- * safe mode or a low-RAM device gets the cheap variant (no glow sweep, no
- * wallpaper), everything else gets the full one.
- *
- * Pure and JVM-testable: the activity computes it once from MatrixSafeMode
- * and ActivityManager, then provides it to composition. Feature gates (SIMKL,
- * AI discovery) stay with MatrixSafeMode; this object covers effects only.
- */
-internal data class MatrixCapabilities(val animations: Boolean, val wallpaper: Boolean) {
+internal enum class MatrixMaterialQuality { FULL, STATIC, CHEAP }
+internal enum class MatrixMotionPolicy { NORMAL, REDUCED }
+
+/** Material, motion and cross-window support are independent runtime decisions. */
+internal data class MatrixCapabilities(
+    val material: MatrixMaterialQuality,
+    val motion: MatrixMotionPolicy = MatrixMotionPolicy.NORMAL,
+    val crossWindowBlur: Boolean = false,
+) {
+    val liveBlur get() = material == MatrixMaterialQuality.FULL
+    val wallpaper get() = material != MatrixMaterialQuality.CHEAP
+    val animations get() = material == MatrixMaterialQuality.FULL && motion == MatrixMotionPolicy.NORMAL
+    val transitions get() = material != MatrixMaterialQuality.CHEAP && motion == MatrixMotionPolicy.NORMAL
     companion object {
-        /** Full effects: animations on, wallpaper on. */
-        val FULL = MatrixCapabilities(animations = true, wallpaper = true)
-
-        /** Cheap variant: no glow sweep, plain background. */
-        val CHEAP = MatrixCapabilities(animations = false, wallpaper = false)
-
-        fun decide(safeMode: Boolean, lowRam: Boolean): MatrixCapabilities =
-            if (safeMode || lowRam) CHEAP else FULL
+        val FULL = MatrixCapabilities(MatrixMaterialQuality.FULL)
+        val STATIC = MatrixCapabilities(MatrixMaterialQuality.STATIC)
+        val CHEAP = MatrixCapabilities(MatrixMaterialQuality.CHEAP)
+        /** measuredGpu must come from device profiling, never SDK inference. Defaults closed. */
+        fun decide(safeMode: Boolean, lowRam: Boolean, sdkInt: Int, measuredGpu: Boolean = false,
+                   allocationFailed: Boolean = false, lowEffects: Boolean = false,
+                   reducedMotion: Boolean = false, crossWindowSupported: Boolean = false): MatrixCapabilities {
+            val tier = when {
+                safeMode || lowRam || allocationFailed || lowEffects -> MatrixMaterialQuality.CHEAP
+                sdkInt >= 31 && measuredGpu -> MatrixMaterialQuality.FULL
+                else -> MatrixMaterialQuality.STATIC
+            }
+            return MatrixCapabilities(tier, if (reducedMotion) MatrixMotionPolicy.REDUCED else MatrixMotionPolicy.NORMAL,
+                sdkInt >= 31 && crossWindowSupported)
+        }
     }
 }
-
-/** Provided by the Home activity; defaults to full effects (previews, tests). */
 internal val LocalMatrixCapabilities: ProvidableCompositionLocal<MatrixCapabilities> =
-    compositionLocalOf { MatrixCapabilities.FULL }
+    compositionLocalOf { MatrixCapabilities.STATIC }

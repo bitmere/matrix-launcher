@@ -31,7 +31,7 @@ internal data class OrderPage(val title: String, val preference: String, val ent
 internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDateTime, repository: ComposeHomeRepository,
                           refresh: (Boolean) -> Unit, allowListings: () -> Unit, open: (Intent) -> Unit, notice: (String) -> Unit,
                           request: HomeNavigationRequest, wallpaper: String?, network: NetworkState, wallpaperChanged: () -> Unit, listingsAllowed: Boolean,
-                          pageChanged: (String) -> Unit, reloadStatus: String = "") {
+                          pageChanged: (String) -> Unit, reloadStatus: String = "", wallpaperGeneration: Long = 0L) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var mediaJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
@@ -140,16 +140,26 @@ internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: Loca
     }
     BackHandler(enabled = page != "home" && page != "order") { back() }
 
-    MatrixHome(snapshot, loading, clock, repository, page == "home", wallpaper, network, request.focusReset,
+    val reducedMotion = rememberMatrixReducedMotion()
+    val glassSource = rememberMatrixGlassSource(repository, wallpaper, wallpaperGeneration, reducedMotion)
+    val inheritedCapabilities = LocalMatrixCapabilities.current
+    val glassCapabilities = inheritedCapabilities.copy(
+        material = if (glassSource.allocationFailed) MatrixMaterialQuality.CHEAP else inheritedCapabilities.material,
+        motion = if (reducedMotion) MatrixMotionPolicy.REDUCED else inheritedCapabilities.motion)
+    CompositionLocalProvider(LocalMatrixGlassSource provides glassSource, LocalMatrixCapabilities provides glassCapabilities) {
+    CompositionLocalProvider(LocalMatrixSurfaceVisible provides (page == "home")) {
+    MatrixHome(snapshot, loading, clock, repository, page == "home", if (glassCapabilities.wallpaper) wallpaper else null, network, request.focusReset,
         settings = { push("settings") }, apps = { push("apps") }, refresh = { refresh(true) },
         inputs = { push("inputs") }, wifi = { open(SystemSettings.intent(context, Settings.ACTION_WIFI_SETTINGS)) }, search = { push("search") },
         appClick = { repository.appIntent(it.id)?.let(open) }, favoritesEdit = { push("favorites") },
         mediaClick = ::activate, mediaHold = ::mediaOrder,
         appHold = { managedApp = it; push("app-options") })
+    }
 
     if (page != "home") {
         val wide = page in listOf("apps", "favorites", "sources", "list", "search", "wallpaper-gallery") || page.startsWith("wallpaper-device:")
         Dialog(onDismissRequest = { if (page != "order") back() }, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = page != "order")) {
+            MatrixDialogBlur()
             var sawFreshDown by remember(page) { mutableStateOf(false) }
             BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .42f)).onPreviewKeyEvent { event ->
                 val native = event.nativeKeyEvent
@@ -248,6 +258,7 @@ internal fun MatrixHomeApp(snapshot: HomeSnapshot, loading: Boolean, clock: Loca
                 }
             }
         }
+    }
     }
 }
 

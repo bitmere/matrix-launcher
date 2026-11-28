@@ -2,7 +2,6 @@
 package com.matrix.launcher
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -12,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusDirection
@@ -20,17 +18,10 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.isSpecified
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -42,16 +33,15 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 
 /** A single, pinned Home row. Only its background is frosted; content stays sharp. */
 @Composable
-internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus: Boolean, onFocus: () -> Unit) {
+internal fun NowPlayingCard(item: NowPlayingItem, ownsFocus: Boolean, onFocus: () -> Unit) {
     val session = item.session
     val shape = RoundedCornerShape(MatrixLayout.panelCorner)
-    val blue = Color(0xFF4B9FDF)
-    val palette = remember { ArtworkPalette.app(blue.toArgb()) }
+    val ambient = LocalMatrixGlassSource.current?.analysis?.tint ?: MaterialTheme.colorScheme.onSurface.toArgb()
+    val palette = remember(ambient) { ArtworkPalette.app(ambient) }
     var focused by remember { mutableStateOf(false) }
     var focusedCommand by remember { mutableStateOf<NowPlayingCommand?>(null) }
     val cardFocus = remember { FocusRequester() }
@@ -77,13 +67,8 @@ internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus:
             borderHolder.resolve(size.width, size.height, 0f, radius.toPx(), .75.dp.toPx(), spread.toPx(), palette)
                 ?.let { border -> drawIntoCanvas { border.drawGlow(it.nativeCanvas, rotation.value) } }
         })
-        Box(Modifier.matchParentSize().clip(shape)) {
-            NowPlayingFrost(wallpaper, Modifier.matchParentSize())
-            Box(Modifier.matchParentSize().background(MaterialTheme.colorScheme.surface.copy(alpha = .72f)))
-            Box(Modifier.matchParentSize().background(blue.copy(alpha = .16f)))
-            Box(Modifier.matchParentSize().background(MatrixControlStyle.glass(MaterialTheme.colorScheme)))
-        }
-        Row(Modifier.fillMaxWidth().border(.75.dp, blue.copy(alpha = .45f), shape)
+        Box(Modifier.matchParentSize().clip(shape).matrixGlassSurface(MatrixGlass.Role.NowPlaying))
+        Row(Modifier.fillMaxWidth()
             .padding(MatrixLayout.gap), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MatrixLayout.gap)) {
             Row(Modifier.weight(1f).heightIn(min = MatrixControlStyle.minHeight)
@@ -138,44 +123,4 @@ internal fun NowPlayingCard(item: NowPlayingItem, wallpaper: String?, ownsFocus:
             cardFocus.requestFocus()
         }
     }
-}
-
-/** Repaint the same backdrop at the row's coordinates into a card-sized blur layer. */
-@Composable
-private fun NowPlayingFrost(wallpaper: String?, modifier: Modifier) {
-    val backdrop = LocalMatrixBackdrop.current
-    val capabilities = LocalMatrixCapabilities.current
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    val backdropSize = backdrop?.size ?: androidx.compose.ui.unit.IntSize.Zero
-    val context = LocalContext.current
-    val wallpaperRequest = remember(context, wallpaper, capabilities.wallpaper, backdropSize) {
-        if (wallpaper != null && capabilities.wallpaper && backdropSize.width > 0 && backdropSize.height > 0) {
-            ImageRequest.Builder(context).data(wallpaper)
-                .size(backdropSize.width.coerceIn(1, 1920), backdropSize.height.coerceIn(1, 1080)).build()
-        } else null
-    }
-    val painter = rememberAsyncImagePainter(wallpaperRequest, contentScale = ContentScale.Crop)
-    val dim = remember(backdropSize.height) { Brush.verticalGradient(listOf(Color.Black.copy(alpha = .65f),
-        Color.Black.copy(alpha = .35f), Color.Black.copy(alpha = .85f)), endY = backdropSize.height.coerceAtLeast(1).toFloat()) }
-    Box(modifier.onGloballyPositioned { coordinates ->
-        backdrop?.coordinates?.takeIf { it.isAttached && coordinates.isAttached }?.let {
-            offset = it.localPositionOf(coordinates, Offset.Zero)
-        }
-    }.then(if (capabilities.wallpaper) Modifier.blur(18.dp) else Modifier).drawBehind {
-        translate(-offset.x, -offset.y) {
-            drawIntoCanvas { backdrop?.draw(it.nativeCanvas) }
-            if (wallpaper != null && capabilities.wallpaper) {
-                val target = Size(backdropSize.width.toFloat(), backdropSize.height.toFloat())
-                val source = painter.intrinsicSize
-                if (source.isSpecified && source.width.isFinite() && source.height.isFinite() && source.width > 0 && source.height > 0) {
-                    val scale = ContentScale.Crop.computeScaleFactor(source, target)
-                    val scaled = Size(source.width * scale.scaleX, source.height * scale.scaleY)
-                    translate((target.width - scaled.width) / 2, (target.height - scaled.height) / 2) {
-                        with(painter) { draw(scaled) }
-                    }
-                }
-                drawRect(dim, size = target)
-            }
-        }
-    })
 }

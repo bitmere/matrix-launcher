@@ -7,6 +7,7 @@ import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -16,6 +17,24 @@ internal class MatrixWallpaperRepository(context: Context, private val prefs: Sh
     private val store by lazy { PersonalWallpapers(context.applicationContext, prefs) }
     companion object { private val gate = Mutex() }
     suspend fun current(next: Boolean = false) = withContext(Dispatchers.IO) { gate.withLock { store.current(next)?.absolutePath } }
+    /** Polling is cheap in retained memory; byte identity detects same-path rewrites, even with equal mtime/length. */
+    suspend fun contentIdentity(path: String?): String? = withContext(Dispatchers.IO) {
+        if (path == null) return@withContext null
+        try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            java.io.File(path).inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: java.io.IOException) { null }
+    }
     suspend fun import(uris: List<Uri>) = withContext(Dispatchers.IO) { gate.withLock {
         val job = currentCoroutineContext()
         store.importImages(uris) { job.isActive }
