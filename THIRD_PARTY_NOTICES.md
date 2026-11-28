@@ -129,3 +129,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE
 ```
+
+## Haze 2.1.0
+
+Home's live header blur uses `dev.chrisbanes.haze:haze` and
+`dev.chrisbanes.haze:haze-blur`, version 2.1.0.
+Copyright Christopher Banes and the Haze project contributors.
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/chrisbanes/haze/tree/2.1.0
+License: https://www.apache.org/licenses/LICENSE-2.0

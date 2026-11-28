@@ -18,6 +18,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
@@ -26,8 +33,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -36,13 +43,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.matrix.launcher.core.HomeCardSizing
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 
@@ -56,7 +59,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                        appClick: (LaunchApp) -> Unit, favoritesEdit: () -> Unit,
                        mediaClick: (MediaCard) -> Unit, mediaHold: (MediaRow, MediaCard) -> Unit, appHold: (LaunchApp) -> Unit) {
     var title by remember { mutableStateOf("Your favorites") }
-    val locale = Locale.getDefault()
+    val locale = LocalLocale.current.platformLocale
     val timeFormat = remember(locale) { DateTimeFormatter.ofPattern("h:mm a", locale) }
     val dateFormat = remember(locale) { DateTimeFormatter.ofPattern("EEEE d MMMM", locale) }
     val focusArtwork = rememberMatrixArtworkFocus(repository, active)
@@ -74,10 +77,21 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
     val focusedCard = remember { HomeCardPosition() }
     var backRow by remember { mutableStateOf("") }
     var backToken by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableIntStateOf(0) }
+    val headerBottom = with(density) { 34.dp.toPx() } + headerHeight
+    val currentHeaderBottom by rememberUpdatedState(headerBottom)
+    val liveBlur = active && headerTreatment(LocalMatrixCapabilities.current.material) == HeaderTreatment.LIVE && android.os.Build.VERSION.SDK_INT >= 31
+    val hazeState = rememberHazeState()
+    val headerBlur = remember { HazeBlurStyle {
+        blurRadius(MatrixGlass.blurRadius)
+        noiseFactor(0f)
+        colorEffects(emptyList())
+    } }
     val revealInset = with(LocalDensity.current) { MatrixLayout.focusInset.toPx() }
     val verticalReveal = remember(revealInset) { object : BringIntoViewSpec {
         override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) =
-            if (focusedRow == "favorites" || focusedRow == "header") 0f else ComposeRevealPolicy.distance(offset, size, containerSize, revealInset)
+            if (focusedRow == "favorites" || focusedRow == "header") 0f else ComposeRevealPolicy.distance(offset - currentHeaderBottom, size, containerSize - currentHeaderBottom, revealInset)
     } }
     // The framework reveals channels; one cancellable animation owns returning to the top group.
     LaunchedEffect(list) {
@@ -115,22 +129,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
     }
     val columns = HomeCardSizing.dockColumns(favorites.size)
     val mediaColumns = HomeCardSizing.contentColumns(MatrixSafeMode.effectiveColumns(repository.prefs, repository.safeMode))
-    MatrixBackdropSurface(artworkBackdrop = wallpaper == null) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val availableWidth = maxWidth
-        if (wallpaper != null) {
-            // Decode at most 1920x1080: a 4K TV must not allocate a full-screen
-            // backdrop bitmap. Smaller screens decode at view size, as before.
-            val density = LocalDensity.current
-            val wallpaperWidth = minOf((maxWidth.value * density.density).roundToInt(), 1920)
-            val wallpaperHeight = minOf((maxHeight.value * density.density).roundToInt(), 1080)
-            AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(wallpaper).size(wallpaperWidth, wallpaperHeight).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .65f), Color.Black.copy(alpha = .35f), Color.Black.copy(alpha = .85f)))))
-        }
-        val dockWidth = MatrixLayout.cardWidth(maxWidth, columns, 46.dp + MatrixLayout.dockInset)
-        val mediaWidth = MatrixLayout.cardWidth(maxWidth, mediaColumns, MatrixLayout.channelInset)
-        CompositionLocalProvider(LocalBringIntoViewSpec provides verticalReveal) {
-        LazyColumn(state = list, modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
             val vertical = event.key == Key.DirectionDown || event.key == Key.DirectionUp
             if (vertical && event.type == KeyEventType.KeyDown && inspection != null) {
                 inspection.navigationDowns++
@@ -140,32 +139,43 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
                 ComposeRevealPolicy.deferRepeat(event.nativeKeyEvent.repeatCount, list.isScrollInProgress)
             if (deferred) inspection?.deferredRepeats = (inspection?.deferredRepeats ?: 0) + 1
             deferred
-        }, contentPadding = PaddingValues(vertical = 34.dp)) {
-            item(key = "header", contentType = "header") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 48.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column { Text("WELCOME HOME", style = MaterialTheme.typography.labelLarge)
-                        Text(clock.format(timeFormat), style = MaterialTheme.typography.displayMedium)
-                        Text(clock.format(dateFormat).uppercase(locale), style = MaterialTheme.typography.bodyMedium) }
-                    Row(Modifier.focusProperties {
-                        onExit = {
-                            if (requestedFocusDirection == FocusDirection.Left ||
-                                requestedFocusDirection == FocusDirection.Right ||
-                                requestedFocusDirection == FocusDirection.Up) cancelFocusChange()
-                        }
-                    }.focusGroup().onFocusChanged { if (it.hasFocus) { focusedRow = "header"; focusedCard.index = 0; inspection?.homeRow = -1; inspection?.homeCard = -1 } }, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (repository.prefs.getBoolean("home_search_enabled", true)) {
-                            Tool(R.drawable.ic_search, "Search", search)
-                        }
-                        Tool(R.drawable.ic_input, "Inputs", inputs, if (favorites.isEmpty()) Modifier.focusRequester(initialFocus) else Modifier)
-                        Tool(if (network.ethernet) R.drawable.ic_ethernet else R.drawable.ic_wifi, if (network.connected) "Connected" else "Offline", wifi, connected = network.connected)
-                        Tool(R.drawable.ic_home_refresh, if (loading) "Loading" else "Refresh", { if (!loading) refresh() })
-                        Tool(R.drawable.ic_apps, "All apps", apps); Tool(R.drawable.ic_settings, "Settings", settings)
-                    }
+        }) {
+        // Compose the header first for focus traversal; draw it above the source without capturing it.
+        Row(Modifier.zIndex(1f).fillMaxWidth().padding(top = 34.dp, start = 48.dp, end = 48.dp)
+            .onSizeChanged { headerHeight = it.height }
+            .then(if (liveBlur) Modifier.hazeBlur(input = HazeInput.Sources(hazeState), style = headerBlur) else Modifier)
+            .matrixGlassSurface(MatrixGlass.Role.Header, frost = !liveBlur), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column { Text("WELCOME HOME", style = MaterialTheme.typography.labelLarge)
+                Text(clock.format(timeFormat), style = MaterialTheme.typography.displayMedium)
+                Text(clock.format(dateFormat).uppercase(locale), style = MaterialTheme.typography.bodyMedium) }
+            Row(Modifier.focusProperties {
+                onExit = {
+                    if (requestedFocusDirection == FocusDirection.Left ||
+                        requestedFocusDirection == FocusDirection.Right ||
+                        requestedFocusDirection == FocusDirection.Up) cancelFocusChange()
                 }
-                Spacer(Modifier.height(100.dp))
+            }.focusGroup().onFocusChanged { if (it.hasFocus) { focusedRow = "header"; focusedCard.index = 0; inspection?.homeRow = -1; inspection?.homeCard = -1 } }, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (repository.prefs.getBoolean("home_search_enabled", true)) {
+                    Tool(R.drawable.ic_search, "Search", search)
+                }
+                Tool(R.drawable.ic_input, "Inputs", inputs, if (favorites.isEmpty()) Modifier.focusRequester(initialFocus) else Modifier)
+                Tool(if (network.ethernet) R.drawable.ic_ethernet else R.drawable.ic_wifi, if (network.connected) "Connected" else "Offline", wifi, connected = network.connected)
+                Tool(R.drawable.ic_home_refresh, if (loading) "Loading" else "Refresh", { if (!loading) refresh() })
+                Tool(R.drawable.ic_apps, "All apps", apps); Tool(R.drawable.ic_settings, "Settings", settings)
             }
+        }
+    MatrixBackdropSurface(
+        modifier = if (liveBlur) Modifier.hazeSource(state = hazeState) else Modifier,
+        artworkBackdrop = wallpaper == null
+    ) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val availableWidth = maxWidth
+        val dockWidth = MatrixLayout.cardWidth(maxWidth, columns, 46.dp + MatrixLayout.dockInset)
+        val mediaWidth = MatrixLayout.cardWidth(maxWidth, mediaColumns, MatrixLayout.channelInset)
+        CompositionLocalProvider(LocalBringIntoViewSpec provides verticalReveal) {
+        LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 34.dp + with(density) { headerHeight.toDp() } + 100.dp, bottom = 34.dp)) {
             if (nowPlaying != null) item(key = MatrixPrefs.NOW_PLAYING_ROW, contentType = "now-playing") {
-                NowPlayingCard(nowPlaying, wallpaper, focusedRow == MatrixPrefs.NOW_PLAYING_ROW) {
+                NowPlayingCard(nowPlaying, focusedRow == MatrixPrefs.NOW_PLAYING_ROW) {
                     focusedRow = MatrixPrefs.NOW_PLAYING_ROW
                     focusedCard.index = 0
                     inspection?.homeRow = -2
@@ -231,6 +241,7 @@ internal fun MatrixHome(snapshot: HomeSnapshot, loading: Boolean, clock: LocalDa
             }
         }
         }
+    }
     }
     }
     LaunchedEffect(favorites.isNotEmpty(), homeRequest) { if (active) {

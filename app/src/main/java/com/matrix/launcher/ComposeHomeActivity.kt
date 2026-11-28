@@ -47,13 +47,15 @@ class ComposeHomeActivity : ComponentActivity() {
     private var observing = false
     private val remoteConfig = RemoteConfig.Loader()
     private var request by mutableStateOf(HomeNavigationRequest())
+    private var wallpaperContentIdentity: String? = null
+    private var wallpaperGeneration by mutableStateOf(0L)
     private var wallpaper by mutableStateOf<String?>(null)
     private var network by mutableStateOf(NetworkState())
     private var wallpaperJob: Job? = null
     private val inspection = MatrixUiInspection()
     private val keyLatency = MatrixKeyLatency()
     private var safeMode = false
-    private var capabilities = MatrixCapabilities.FULL
+    private var capabilities by mutableStateOf(MatrixCapabilities.STATIC)
     private var homeActive = true
     private var stoppedSinceResume = true
     private val idleHandler = Handler(Looper.getMainLooper())
@@ -182,7 +184,13 @@ class ComposeHomeActivity : ComponentActivity() {
         intent.removeExtra(MatrixSafeMode.INTENT_EXTRA)
         // One capability decision for old and new TVs: safe mode or a low-RAM
         // device gets the cheap variant (no glow sweep, no wallpaper).
-        capabilities = MatrixCapabilities.decide(safeMode, getSystemService(ActivityManager::class.java)?.isLowRamDevice == true)
+        capabilities = MatrixCapabilities.decide(safeMode, getSystemService(ActivityManager::class.java)?.isLowRamDevice == true, android.os.Build.VERSION.SDK_INT)
+        MatrixGpuQualification(this, this, capabilities.material != MatrixMaterialQuality.CHEAP,
+            homeVisible = { homeActive }, onResult = { measured ->
+                capabilities = MatrixCapabilities.decide(safeMode,
+                    getSystemService(ActivityManager::class.java)?.isLowRamDevice == true,
+                    android.os.Build.VERSION.SDK_INT, measuredGpu = measured)
+            })
         MatrixTheme.apply(ThemeState.defaults())
         lifecycleScope.launch {
             val theme = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -204,7 +212,7 @@ class ComposeHomeActivity : ComponentActivity() {
             CompositionLocalProvider(LocalMatrixUiInspection provides inspection, LocalMatrixCapabilities provides capabilities) { MatrixTvTheme {
             MatrixHomeApp(snapshot, loading, clock, repository, ::refresh,
                 ::requestListings, ::open, ::notice, request, wallpaper, network, ::wallpaperChanged, listingsAllowed,
-                { inspection.page = it; homeActive = it == "home"; scheduleIdle() }, reloadStatus)
+                { inspection.page = it; homeActive = it == "home"; scheduleIdle() }, reloadStatus, wallpaperGeneration)
         } } }
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) {
             launch { networkStates(applicationContext).collect { network = it } }
@@ -212,7 +220,7 @@ class ComposeHomeActivity : ComponentActivity() {
                 // Cheap variant: no wallpaper (plain background).
                 if (capabilities.wallpaper) {
                     repository.wallpapers.refresh(false)
-                    wallpaper = repository.wallpapers.current()
+                    updateWallpaperSource()
                 }
                 delay(60_000)
             } }
@@ -252,9 +260,19 @@ class ComposeHomeActivity : ComponentActivity() {
         documentResult.cancel()
         noticeToast?.cancel(); remoteConfig.cancel(); unregisterReceiver(packages); repository.clear(); super.onDestroy()
     }
+    private suspend fun updateWallpaperSource() {
+        val path = repository.wallpapers.current()
+        val identity = repository.wallpapers.contentIdentity(path)
+        if (path != wallpaper || identity != wallpaperContentIdentity) {
+            wallpaper = path
+            wallpaperContentIdentity = identity
+            wallpaperGeneration++
+        }
+    }
+
     private fun wallpaperChanged() {
         if (!capabilities.wallpaper) return
-        wallpaperJob?.cancel(); wallpaperJob = lifecycleScope.launch { wallpaper = repository.wallpapers.current() }
+        wallpaperJob?.cancel(); wallpaperJob = lifecycleScope.launch { updateWallpaperSource() }
     }
     private fun refresh(force: Boolean = false) {
         if (force && loading) return

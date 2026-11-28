@@ -310,22 +310,25 @@ internal fun MatrixSearchScreen(repository: ComposeHomeRepository, windowWidth: 
         else startListening()
     }
     val voiceAvailable = remember(context) { SpeechRecognizer.isRecognitionAvailable(context) || voiceIntent.resolveActivity(context.packageManager) != null }
-    val voicePulse = rememberInfiniteTransition(label = "voicePulse")
-    val pulseAlpha by voicePulse.animateFloat(
-        initialValue = .35f, targetValue = .95f,
-        animationSpec = infiniteRepeatable(tween(650, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "voiceAlpha"
-    )
-    val pulseScale by voicePulse.animateFloat(
-        initialValue = 1f, targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(tween(650, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "voiceScale"
-    )
-    val voiceRotation by voicePulse.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart),
-        label = "voiceRotation"
-    )
+    val ornamentalMotion = LocalMatrixCapabilities.current.animations
+    val pulseAlpha by if (ornamentalMotion) {
+        rememberInfiniteTransition(label = "pulseAlpha").animateFloat(
+            initialValue = .35f, targetValue = .95f,
+            animationSpec = infiniteRepeatable(tween(650, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "pulseAlpha")
+    } else remember { mutableStateOf(.35f) }
+    val pulseScale by if (ornamentalMotion) {
+        rememberInfiniteTransition(label = "pulseScale").animateFloat(
+            initialValue = 1f, targetValue = 1.08f,
+            animationSpec = infiniteRepeatable(tween(650, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "pulseScale")
+    } else remember { mutableStateOf(1f) }
+    val voiceRotation by if (ornamentalMotion) {
+        rememberInfiniteTransition(label = "voiceRotation").animateFloat(
+            initialValue = 0f, targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart),
+            label = "voiceRotation")
+    } else remember { mutableStateOf(0f) }
     fun navigateBack() {
         if (isListening || recognizer != null) {
             stopListeningHardware()

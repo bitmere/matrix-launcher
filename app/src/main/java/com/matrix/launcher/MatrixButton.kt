@@ -1,5 +1,6 @@
 package com.matrix.launcher
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
@@ -72,9 +74,43 @@ internal object MatrixControlStyle {
         colors.onSurface.copy(alpha = .60f), colors.onSurface.copy(alpha = .12f),
         colors.onSurface.copy(alpha = .36f))))
     @Composable
-    fun glass(colors: ColorScheme): Brush = remember(colors.onSurface) {
-        Brush.verticalGradient(listOf(colors.onSurface.copy(alpha = .15f),
-            colors.onSurface.copy(alpha = .035f), colors.onSurface.copy(alpha = .08f)))
+    fun glass(colors: ColorScheme): Brush {
+        val analysis = LocalMatrixGlassSource.current?.analysis ?: WallpaperAnalysis.Empty
+        return remember(analysis, colors.onSurface) {
+            MatrixGlass.material(MatrixGlass.Role.Header, analysis, colors.onSurface).fill
+        }
+    }
+}
+
+/** Wallpaper-aware material recipes. Surface adoption remains a separate step from tokens.
+ * Fill includes the strongest edge highlight when solving contrast; draw edge light only at the rim.
+ * Geometry continues to come from MatrixLayout.panelCorner/cardCorner. */
+internal object MatrixGlass {
+    enum class Role { Header, NowPlaying, Panel }
+    val blurRadius = 18.dp // Never exceed 24dp; raising this requires device measurement.
+    val edgeWidth = .75.dp
+    data class Material(val fill: Brush, val tint: Color, val edgeLight: Brush, val scrim: GlassScrim, val fillStops: List<Color>)
+    fun material(role: Role, analysis: WallpaperAnalysis, foreground: Color): Material {
+        val light = analysis.luminance.toFloat().coerceIn(0f, 1f)
+        val minimum = when (role) {
+            Role.Header -> .60 + .15 * light
+            Role.NowPlaying -> .72
+            Role.Panel -> .85 + .10 * light
+        }
+        val tintAlpha = when (role) { Role.Header -> .06; Role.NowPlaying -> .08; Role.Panel -> .04 }
+        val scrim = GlassContrast.scrim(foreground.toArgb(), analysis.tint, tintAlpha, .15, minimum)
+        val tint = Color(analysis.tint).copy(alpha = scrim.tintAlpha.toFloat())
+        // Collapse base + tint into one translucent fill with equivalent source-over composition.
+        val alpha = scrim.tintAlpha + scrim.alpha * (1 - scrim.tintAlpha)
+        val mix = if (alpha == 0.0) 0.0 else scrim.tintAlpha / alpha
+        val fill = Color(GlassContrast.over(analysis.tint, mix, scrim.base)).copy(alpha = alpha.toFloat())
+        val edge = Brush.linearGradient(listOf(
+            Color(analysis.tint).copy(alpha = scrim.highlightAlpha.toFloat()),
+            Color.Transparent, Color(analysis.tint).copy(alpha = (scrim.highlightAlpha * .5).toFloat())))
+        val litAlpha = alpha + scrim.highlightAlpha * (1 - alpha)
+        val litMix = if (litAlpha == 0.0) 0.0 else scrim.highlightAlpha / litAlpha
+        val lit = Color(GlassContrast.over(analysis.tint, litMix, fill.toArgb())).copy(alpha = litAlpha.toFloat())
+        return Material(Brush.verticalGradient(listOf(lit, fill, fill)), tint, edge, scrim, listOf(lit, fill, fill))
     }
 }
 
@@ -87,9 +123,10 @@ internal object MatrixControlStyle {
 internal fun rememberMatrixFocusRotation(focused: Boolean, enabled: Boolean = true): State<Float> {
     val rotation = remember { Animatable(0f) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(focused, lifecycle, enabled) {
+    val visible = LocalMatrixSurfaceVisible.current
+    LaunchedEffect(focused, lifecycle, enabled, visible) {
         rotation.snapTo(0f)
-        if (enabled && focused) lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+        if (enabled && visible && focused) lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             rotation.snapTo(0f)
             rotation.animateTo(1080f, tween(12000, easing = LinearEasing))
         }
@@ -243,8 +280,10 @@ internal class MatrixGlassBorderHolder {
 internal fun MatrixButton(onClick: () -> Unit, modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null, role: MatrixControlRole = MatrixControlRole.Action,
     content: @Composable RowScope.() -> Unit) {
-    Button(onClick = onClick, onLongClick = onLongClick, modifier = modifier.heightIn(min = MatrixControlStyle.minHeight),
-        scale = ButtonDefaults.scale(focusedScale = MatrixLayout.cardFocusScale),
+    val interaction = remember { MutableInteractionSource() }
+    Button(onClick = onClick, onLongClick = onLongClick, interactionSource = interaction,
+        modifier = modifier.matrixFocusScale(interaction).heightIn(min = MatrixControlStyle.minHeight),
+        scale = ButtonDefaults.scale(scale = 1f, focusedScale = 1f, pressedScale = 1f),
         shape = ButtonDefaults.shape(MatrixControlStyle.shape),
         colors = matrixControlColors(role), border = matrixControlBorder(role),
         contentPadding = MatrixControlStyle.padding) {
@@ -269,11 +308,12 @@ internal fun MatrixIconButton(icon: Int, label: String, onClick: () -> Unit,
         inspection?.icons?.put(label, geometry)
         onDispose { if (inspection?.icons?.get(label) === geometry) inspection.icons.remove(label) }
     }
-    IconButton(onClick = onClick,
-        modifier = modifier.size(if (compact) MatrixControlStyle.headerButtonSize else MatrixControlStyle.toolbarButtonSize)
+    val interaction = remember { MutableInteractionSource() }
+    IconButton(onClick = onClick, interactionSource = interaction,
+        modifier = modifier.matrixFocusScale(interaction).size(if (compact) MatrixControlStyle.headerButtonSize else MatrixControlStyle.toolbarButtonSize)
             .onGloballyPositioned { geometry.button = it.boundsInRoot() },
         shape = ButtonDefaults.shape(MatrixControlStyle.shape),
-        scale = ButtonDefaults.scale(focusedScale = MatrixLayout.cardFocusScale),
+        scale = ButtonDefaults.scale(scale = 1f, focusedScale = 1f, pressedScale = 1f),
         colors = matrixControlColors(role), border = matrixControlBorder(role)) {
         Icon(painterResource(icon), label,
             Modifier.size(MatrixControlStyle.iconSize).onGloballyPositioned { geometry.icon = it.boundsInRoot() },

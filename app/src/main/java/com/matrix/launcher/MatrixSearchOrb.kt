@@ -144,8 +144,9 @@ fun MatrixSearchOrb(
 ) {
     // The one motion in this component: a single constant-speed rotation
     // of the sweep-gradient swirl. Nothing else moves.
+    val rotation by if (LocalMatrixCapabilities.current.animations) {
     val transition = rememberInfiniteTransition(label = "searchOrb")
-    val rotation by transition.animateFloat(
+    transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
@@ -154,6 +155,7 @@ fun MatrixSearchOrb(
         ),
         label = "searchOrbRotation"
     )
+    } else androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0f) }
     Canvas(modifier = modifier.size(ORB_SIZE_DP)) {
         val radius = size.minDimension / 2f
         val center = Offset(size.width / 2f, size.height / 2f)

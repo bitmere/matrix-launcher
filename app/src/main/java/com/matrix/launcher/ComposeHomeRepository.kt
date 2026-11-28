@@ -42,12 +42,17 @@ internal class ComposeHomeRepository(private val context: Context) {
             .map { LaunchApp(it, TvFeed.appName(context, it)) }.sortedBy { it.title.lowercase() }.also { appCatalogue = generation to it }
     }
     suspend fun searchApps(query: String): List<LaunchApp> = withContext(Dispatchers.IO) { filterApps(installedApps(), query) }
-    suspend fun palette(uri: String): ArtworkPalette? = withContext(Dispatchers.IO) {
+    suspend fun palette(uri: String, generation: Long? = null): ArtworkPalette? = withContext(Dispatchers.IO) {
         if (uri.isBlank()) return@withContext null
-        colors.get(uri)?.let { return@withContext it }
-        val request = coil.request.ImageRequest.Builder(context).data(uri).size(32).allowHardware(false).build()
+        val cacheKey = if (generation == null) uri else "$uri#$generation"
+        colors.get(cacheKey)?.let { return@withContext it }
+        val request = coil.request.ImageRequest.Builder(context).data(uri).size(32).allowHardware(false)
+            .apply { if (generation != null) {
+                memoryCachePolicy(coil.request.CachePolicy.DISABLED)
+                diskCachePolicy(coil.request.CachePolicy.DISABLED)
+            } }.build()
         val result = coil.Coil.imageLoader(context).execute(request)
-        if (result is coil.request.SuccessResult) ArtworkColor.ambientColors(result.drawable).let { ArtworkPalette(it[0], it[1]) }.also { colors.put(uri, it) } else null
+        if (result is coil.request.SuccessResult) ArtworkColor.ambientColors(result.drawable).let { ArtworkPalette(it[0], it[1]) }.also { colors.put(cacheKey, it) } else null
     }
 
     suspend fun load(force: Boolean = false): HomeSnapshot = withContext(Dispatchers.IO) { homeGate.withLock {
